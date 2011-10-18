@@ -1,0 +1,18 @@
+h1. Chipmunk.js
+
+Chipmunk.js is a port of the Chipmunk:http://chipmunk-physics.net/ library to Javascript. Chipmunk is a rigid body physics library designed for 2D games.
+It's not a 1:1 port of the API, more of an OOP-Port. For instance <code>(space, foo)</code> in Chipmunk is <code>space.addShape(foo)</code> in Chipmunk.js
+
+
+h2. Status
+
+Currently most of the API is ported. As far as I know off the top of my head the only gaps are in Constraints (pretty much nothing done) and Spatial Indexing (only SpatialHash done).
+Besides that there is still a lot of testing, optimizing and cleanup to do so it's not recommend to use the lib in any bigger projects yet. 
+
+h2. Requirements
+
+Until now it only requires a AMD compatible scriptloader like requireJS or curl.js.
+
+
+h2. Questions / Issues
+
