@@ -8,7 +8,7 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/Prime'], fun
     this.eql = eqlFunc;
     this.default_value = undefined;
     // type: HashSetBin
-    this.table = [];
+    this.table = {};//Array(this.size);
     this.pooledBins = undefined;
     this.allocatedBuffers = [];
   };
@@ -26,7 +26,7 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/Prime'], fun
       // Get the next approximate doubled prime.
       var newSize = prime.next(this.size+1);
       // Allocate a new table.
-      var newTable = [];
+      var newTable = {};
       // Iterate over the chains.
       for( var i = 0; i < this.size; i++ ){
         // Rehash the bins into the new table.
@@ -57,7 +57,7 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/Prime'], fun
         return bin;
       }else{
         // Pool is exhausted, make more
-        var count = 10; // TODO: configurable
+        var count = 100; // TODO: configurable
         var buffer = {}; // TODO
         this.allocatedBuffers.push(buffer);
         for( var i = 1; i < count; ++i ){
@@ -80,6 +80,15 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/Prime'], fun
       }
       // create it if necessary.
       if( !bin ){
+        bin = this.table[idx] = {
+          elt: (trans ? trans(ptr, data) : data),
+          hash: hash,
+          next: this.table[idx],
+        };
+        
+        this.entries++;
+        if(this.isFull()) this.resize();
+        /*
         bin = this.getUnusedBin();
         bin.hash = hash;
         bin.elt = (trans ? trans(ptr, data) : data);
@@ -89,6 +98,7 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/Prime'], fun
         if( this.isFull() ){
           this.resize();
         }
+        */
       }
       return bin.elt;
     },
@@ -125,35 +135,45 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/Prime'], fun
     },
     
     each: function(func, data){
-      for( var i = 0; i < this.size; ++i ){
-        var bin = this.table[i];
-        while(bin){
-          var next = bin.next;
-          func(bin.elt, data);
-          bin = next;
+      for( var i in this.table ){
+        if( this.table.hasOwnProperty(i) ){
+          var bin = this.table[i];
+          while(bin){
+            var next = bin.next;
+            func(bin.elt, data);
+            bin = next;
+          }
         }
       }
     },
     
     filter: function(func, data){ // TODO: check if this works correctly (was some pointer magic)
-      for( var i = 0; i < this.size; ++i ){
+      for( var i in this.table ){
         // The rest works similarly to cpHashSetRemove() above.
-        var prev_ptr = this.table[i];
+        var prev_ptr = undefined;
         var bin = this.table[i];
         while(bin){
           var next = bin.next;
-          if( func(bin.elt, data) ){
-            prev_ptr = bin.next;
+          if( bin && bin.elt && func(bin.elt, data) ){
+            prev_ptr = bin;
           }else{
-            prev_ptr = next;
+            if( prev_ptr ){
+              prev_ptr = next;
+            }else{
+              this.table[i] = next;
+            }
             this.entries--;
+           
             this.recycleBin(bin);
           }
           bin = next;
         }
       }
     }
+
+    
   };
+  
   
   return HashSet;
 });

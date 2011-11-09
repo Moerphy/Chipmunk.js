@@ -1,12 +1,12 @@
 define(['cp/Vect'], function(Vect){
-
+  "use strict";
   return {
     relative_velocity: function(a, b, r1, r2 ){
       var v1Sum = a.v.add( r1.perp().mult(a.w) );
       var v2Sum = b.v.add( r2.perp().mult(b.w) );
       return v2Sum.sub(v1Sum);
     },
-    
+
     normal_relative_velocity: function(a, b, r1, r2, n){
       return this.relative_velocity(a, b, r1, r2).dot(n);
     },
@@ -17,8 +17,8 @@ define(['cp/Vect'], function(Vect){
     },
     
     apply_impulses: function(a, b, r1, r2, j){
-      this.apply_impulse(a, j.neg(), r1);
-      this.apply_impulse(b, j, r2);
+      a.applyImpulse(j.neg(), r1);
+      b.applyImpulse(j, r2); 
     },
     
     apply_bias_impulse: function(body, j, r){

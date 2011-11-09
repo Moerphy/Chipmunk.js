@@ -5,7 +5,7 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
   /// They are also used in conjuction with collision handler callbacks
   /// allowing you to retrieve information on the collision and control it.
 
-  var MAX_CONTACTS_PER_ARBITER = 4;
+  var MAX_CONTACTS_PER_ARBITER = 10;
   /// @private
   var ArbiterState = {
     // Arbiter is active and its the first collision.
@@ -43,6 +43,7 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
   Arbiter.State = ArbiterState;
  
   Arbiter.prototype = {
+
     unthreadHelper: function(body){
       var thread = this.threadForBody(body);
       var prev = thread.prev;
@@ -131,18 +132,16 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
     update: function(contacts, handler, a, b ){
       // Arbiters without contact data may exist if a collision function rejected the collision.
       // note: probably not here, but just to be sure.
-      if( this.contacts ){
         // Iterate over the possible pairs to look for hash value matches.
-        for( var i = 0; i < this.contacts.length; ++i ){
-          var old = this.contacts[i];
-          for( var j = 0; j < contacts.length; ++j ){
-            var newContact = contacts[j];
-            // This could trigger false positives, but is fairly unlikely nor serious if it does.
-            if( newContact.hash === old.hash ){
-              // Copy the persistant contact information.
-              newContact.jnAcc = old.jnAcc;
-              newContact.jtAcc = old.jtAcc;
-            }
+      for( var i = 0; this.contacts && i < this.contacts.length; ++i ){
+        var old = this.contacts[i];
+        for( var j = 0; j < contacts.length; ++j ){
+          var newContact = contacts[j];
+          // This could trigger false positives, but is fairly unlikely nor serious if it does.
+          if( newContact.hash === old.hash ){
+            // Copy the persistant contact information.
+            newContact.jnAcc = old.jnAcc;
+            newContact.jtAcc = old.jtAcc;
           }
         }
       }
@@ -167,8 +166,9 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
     preStep: function(dt, slop, bias){
       var a = this.body_a;
       var b = this.body_b;
-      for( var i = 0; i < this.contacts.length; ++i ){
+      for( var i = 0; this.contacts && i < this.contacts.length; ++i ){
         var con = this.contacts[i];
+        // Calculate the offsets.
         con.r1 = con.p.sub(a.p);
         con.r2 = con.p.sub(b.p);
         // Calculate the mass normal and mass tangent.
@@ -188,26 +188,28 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
       }
       var a = this.body_a;
       var b = this.body_b;
-      for( var i =0 ; i < this.contacts.length; ++i ){
+      for( var i =0 ; this.contacts && i < this.numContacts; ++i ){
         var con = this.contacts[i];
-        var j = con.n.rotate( new Vect(con.jnAcc, con.jtAcc) );
-        util.apply_impulses( a, b, con.r1, con.r2, j.mult(dt_coef) );
+        if( con ){
+          var j = con.n.rotate( new Vect(con.jnAcc, con.jtAcc) );
+          util.apply_impulses( a, b, con.r1, con.r2, j.mult(dt_coef) );
+        }
       }
     },
-    
+
     applyImpulse: function(){
       var a = this.body_a;
       var b = this.body_b;
       
-      for( var i =0; i < this.contacts.length; ++i ){
+      for( var i =0; this.contacts && i < this.contacts.length; ++i ){
         var con = this.contacts[i];
         var n = con.n;
         var r1 = con.r1;
         var r2 = con.r2;
         
         // Calculate the relative bias velocities.
-        var vb1 = a.v_bias.add( r1.perp().mult( a.w_bias ) );
-        var vb2 = b.v_bias.add( r2.perp().mult( b.w_bias ) );
+        var vb1 = a.v_bias.add(r1.perp().mult(a.w_bias));
+        var vb2 = b.v_bias.add(r2.perp().mult(b.w_bias));
         var vbn = vb2.sub(vb1).dot(n);
         
         // Calculate and clamp the bias impulse.

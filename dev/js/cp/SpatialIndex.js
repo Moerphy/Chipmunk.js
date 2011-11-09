@@ -10,6 +10,9 @@ define(['cp/Prime'], function(prime){
     this.bbfunc = bbfunc;
     this.staticIndex = staticIndex;
     if( staticIndex ){
+      if( staticIndex.dynamicIndex ){
+        throw "This static index is already is already associated with a dynamic index.";
+      }
       staticIndex.dynamicIndex = this;
     }
   };

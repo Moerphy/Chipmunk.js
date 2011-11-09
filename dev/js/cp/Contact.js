@@ -25,7 +25,7 @@ define([], function(){
     var arbHashID = ( a * hash_coef) ^ ( b * hash_coef);  // TODO:  find better port solution to this hashing thingy..
     return arbHashID;
   };
-  var MAX_CONTACTS_PER_ARBITER = 10; // TODO: configurable
+  var MAX_CONTACTS_PER_ARBITER = 100; // TODO: configurable
   
   var Contact = function(/* Vect */ p, /* Vect */ n, /* number */ dist, /* number */ hash, /* optional object*/ o){
     if( !o ){
@@ -46,31 +46,33 @@ define([], function(){
   };
   
   Contact.prototype = {
-    nextPoint: function( /* object */ numPtr ){
-      var index = numPtr.num;
-      if( index < MAX_CONTACTS_PER_ARBITER ){
-        numPtr.num = index+1;
-        return this[index];
-      }else{
-        return this[MAX_CONTACTS_PER_ARBITER - 1];
-      }
-    },
-    
-    findPointsBehindSeg: function(/*number*/ num, /* SegmentShape */ seg, /* PolyShape */ poly, /* number */ pDist, /* number */ coef ){
-      var dta = seg.tn.cross(seg.ta);
-      var dtb = seg.tn.cross(seg.tb);
-      var n = seg.tn.mult(coef);
-      for( var i = 0; i < poly.numVerts; ++i ){
-        var v = poly.tVerts[i];
-        if( v.dot(n) < seg.tn.dot(seg.ta) * coef + seg.r ){
-          var dt = seg.tn.cross(v);
-          if( dta >= dt && dt >= dtb ){
-            new Contact( v, n, pDist, hash_pair(poly.shape.hashid, i), this.nextPoint({num: num}) );
-          }
+  };
+  
+  Contact.nextPoint = function( arr, /* object */ numPtr ){
+    var index = numPtr.num;
+    if( index < MAX_CONTACTS_PER_ARBITER ){
+      numPtr.num = index+1;
+      return arr[index];
+    }else{
+      return arr[MAX_CONTACTS_PER_ARBITER - 1];
+    }
+  };
+
+  Contact.findPointsBehindSeg = function( /* array */ arr, /* object */ num, /* SegmentShape */ seg, /* PolyShape */ poly, /* number */ pDist, /* number */ coef ){
+    var dta = seg.tn.cross(seg.ta);
+    var dtb = seg.tn.cross(seg.tb);
+    var n = seg.tn.mult(coef);
+    for( var i = 0; i < poly.numVerts; ++i ){
+      var v = poly.tVerts[i];
+      if( v.dot(n) < seg.tn.dot(seg.ta) * coef + seg.r ){
+        var dt = seg.tn.cross(v);
+        if( dta >= dt && dt >= dtb ){
+          arr.push( new Contact( v, n, pDist, hash_pair(poly.hashid, i), Contact.nextPoint(arr, num ) ) );
         }
       }
     }
   };
+
 
 
   /*

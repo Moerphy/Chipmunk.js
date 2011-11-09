@@ -274,6 +274,10 @@ define([], function(){
       } else {
         return this;
       }
+    },
+    
+    toString: function(){
+      return '('+this.x + '/'+ this.y + ')';
     }
   };
 

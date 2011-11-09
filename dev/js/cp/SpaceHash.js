@@ -150,7 +150,7 @@ define(['cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Prime'], fun
     hand.retain();
     return hand;
   };
-  
+
   /*
   struct cpSpaceHashBin {
     cpHandle *handle;
@@ -161,18 +161,10 @@ define(['cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Prime'], fun
   
   var SpaceHashBin = function(){
     this.handle = undefined;
-    this._next = undefined;
-    this.count = (++bincounter);
+    this.next = undefined;
   };
   SpaceHashBin.prototype = {
-    get next(){
-      return this._next;
-    },
-    set next(val){
-      //debugger;
-      this._next = val;
-    },
-    
+
     containsHandle: function(hand){
       var bin = this;
       var c = 0;
@@ -180,15 +172,17 @@ define(['cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Prime'], fun
         if( bin.handle === hand ){
           return true;
         }
-        bin.checked = true;
         bin = bin.next;
+        
         c++;
-      }while( bin && !bin.checked );
+      }while( bin );
+      //*
       var bin = this;
       for( var i = 0; i < c; ++i ){ // TODO: check why the fuck i have circular linked lists o_O
         bin.checked = false;
         bin = bin.next;
       }
+      //*/ // TODO ?
       return false;
     }
   };
@@ -214,17 +208,17 @@ define(['cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Prime'], fun
     SpatialIndex.call(this, bbfunc);
     this.allocTable(prime.next());
     this.celldim = celldim;
-    this.handleSet = new HashSet( Handle.prototype.setEql  );
+    this.handleSet = new HashSet( 0, Handle.prototype.setEql  );
     this.pooledHandles = [];
-    this.pooledBins = undefined;
+    //this.pooledBins = undefined;
     this.allocatedBuffers = []; // TODO: probably can remove this. Keep for compat. reasons.
     this.stamp = 1;
   };
   
   SpaceHash.prototype = util.extend( new SpatialIndex(), {
     recycleBin: function(bin){
-      bin.next = this.pooledBins;
-      this.pooledBins = bin;
+      //bin.next = this.pooledBins;
+      //this.pooledBins = bin;
     },
     clearTableCell: function(idx){
       var bin = this.table[idx];
@@ -237,12 +231,15 @@ define(['cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Prime'], fun
       this.table[idx] = undefined;
     },
     clearTable: function(){
-      for( var i = 0; i < this.numcells; ++i ){
-        this.clearTableCell(i);
+      //for( var i = 0; i < this.numcells; ++i ){
+      for( var i in this.table ){
+        if( this.table.hasOwnProperty(i) ){
+          this.clearTableCell(i);
+        }
       }
     },
     getEmptyBin: function(){
-      var bin = this.pooledBins;
+      var bin; // = this.pooledBins;
       if( bin ){
         this.pooledBins = bin.next;
         return bin;
@@ -254,7 +251,7 @@ define(['cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Prime'], fun
     },
     allocTable: function(numcells){
       this.numcells = numcells;
-      this.table = [];
+      this.table = {};
     },
     handle: function(hand, bb){
       // Find the dimensions in cell coordinates.
@@ -281,10 +278,11 @@ define(['cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Prime'], fun
         }
       }
     },
-    
+
+
     insert: function(obj, hashid){
       var hand = this.handleSet.insert(hashid, obj, this, Handle.setTrans );
-      this.handle(hand, this/*.spatialIndex*/.bbfunc.call(obj)); // todo: .spatialIndex ?
+      this.handle(hand, this.bbfunc.call(obj));
     },
     
     rehashObject: function(obj, hashid){
@@ -355,7 +353,7 @@ define(['cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Prime'], fun
         data: data
       };
       this.handleSet.each(queryRehash_helper, context);
-      this.collideStatic(func, data); 
+      this.collideStatic(func, data);  // TODO: ?
     },
     // modified from http://playtechs.blogspot.com/2007/03/raytracing-on-grid.html
     segmentQuery: function(obj, a, b, t_exit, func, data){

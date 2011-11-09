@@ -1,4 +1,4 @@
-define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array'], function(Vect, cpf, util, arrays){
+define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], function(Vect, cpf, util, arrays, assert){
   "use strict";
   // StaticBodySingleton
   
@@ -59,7 +59,7 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array'], function(Vect, 
      * (false is node.root is set)
      */
     isSleeping: function(){
-      return this.node.root === undefined;
+      return this.node.root !== undefined;
     },
     
     /**
@@ -162,7 +162,7 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array'], function(Vect, 
     
     updateVelocity: function(gravity, damping, dt){
       this.v = this.v.mult(damping).add(gravity.add(this.f.mult(this.m_inv)).mult(dt)).clamp(this.v_limit);
-      
+
       var w_limit = this.w_limit;
       this.w = cpf.clamp(this.w*damping + this.t*this.i_inv*dt, -w_limit, w_limit);
     },
@@ -187,7 +187,9 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array'], function(Vect, 
     
     applyImpulse: function( j, r ){
       this.activate();
-      util.apply_impulse(j, r); 
+      this.v = this.v.add( j.mult(this.m_inv) );
+      this.w += this.i_inv * r.cross(j);
+      //util.apply_impulse(this, j, r); 
     },
     
     eachShape: function( func, data ){
@@ -244,30 +246,35 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array'], function(Vect, 
       this.sleepWithGroup(undefined);
     },
     sleepWithGroup: function(group){
-      if( !this.isStatic() && !this.isRogue() ){
-        var space = this.space;
+      assert.hard( !this.isStatic() && !this.isRogue() , "Rogue and static bodies cannot be put to sleep." );
+      var space = this.space;
         
-        /* 
-        // TODO: include checks?
-        if( space && !space.locked && (!group || this.isSleeping(group)) && !this.isSleeping() ){}
-        */
-        // #define CP_BODY_FOREACH_SHAPE(body, var)	for(cpShape *var = body->shapeList; var; var = var->next)
-        for( var var1 = this.shapeList; var1; var1 = var1.next ){
-          var1.update(this.p, this.rot);
-        }
-        space.deactivateBody(this);
-        if( group ){
-          var root = group.componentRoot();
-          var node = new ComponentNode(root, root.node.next, 0);
-          this.node = node;
-          root.node.next = this;
-        }else{
-          var node = new ComponentNode(this, undefined, 0);
-          this.node = node;
-          space.sleepingComponents.push(this);
-        }
-        arrays.deleteObj(space.bodies, this);
+      assert.hard(space, "Cannot put a rogue body to sleep." );
+
+      assert.hard(!space.locked, "Bodies cannot be put to sleep during a query or a call to cpSpaceStep(). Put these calls into a post-step callback.");
+      assert.hard(group === undefined || group.isSleeping(), "Cannot use a non-sleeping body as a group identifier.");
+	
+      if(body.isSleeping()){
+        assert.hard(body.componentRoot() === group.componentRoot(), "The body is already sleeping and it's group cannot be reassigned.");
       }
+        
+      // #define CP_BODY_FOREACH_SHAPE(body, var)	for(cpShape *var = body->shapeList; var; var = var->next)
+      for( var var1 = this.shapeList; var1; var1 = var1.next ){
+        var1.update(this.p, this.rot);
+      }
+      space.deactivateBody(this);
+      if( group ){
+        var root = group.componentRoot();
+        var node = new ComponentNode(root, root.node.next, 0);
+        this.node = node;
+        root.node.next = this;
+      }else{
+        var node = new ComponentNode(this, undefined, 0);
+        this.node = node;
+        space.sleepingComponents.push(this);
+      }
+      arrays.deleteObj(space.bodies, this);
+    
     },
 
     componentRoot: function(){

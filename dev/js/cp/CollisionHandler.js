@@ -16,21 +16,22 @@ struct cpCollisionHandler {
 
 define([], function(){
   "use strict";  
-  var CollisionHandler = function(a, b, begin, preSolve, postSolve, seperate, data){
+  var CollisionHandler = function(a, b, begin, preSolve, postSolve, separate, data){
     this.a = a;
     this.b = b;
     this.begin = begin;
     this.preSolve = preSolve;
     this.postSolve = postSolve;
-    this.seperate = seperate;
+    this.separate = separate;
     this.data = data;
   };
   
   CollisionHandler.prototype = {
     clone: function(){
-      return new CollisionHandler( this.a, this.b, this.begin, this.preSolve, this.postSolve, this.seperate, this.data );
+      return new CollisionHandler( this.a, this.b, this.begin, this.preSolve, this.postSolve, this.separate, this.data );
     }
   };
+  
   
   return CollisionHandler;
 });

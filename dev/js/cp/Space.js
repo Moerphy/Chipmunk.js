@@ -6,7 +6,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
     // #define CP_HASH_COEF (3344921057ul)
     // #define CP_HASH_PAIR(A, B) ((cpHashValue)(A)*CP_HASH_COEF ^ (cpHashValue)(B)*CP_HASH_COEF)
     var hash_coef = 3344921057;
-    var arbHashID = ( a * hash_coef) ^ ( b * hash_coef);  // TODO:  find better port solution to this hashing thingy..
+    var arbHashID = ( ( a * hash_coef) ^ ( b * hash_coef) ) & 0x7FFFFFFF ;  // TODO:  find better port solution to this hashing thingy..
     return arbHashID;
   };
   
@@ -27,7 +27,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
     /// A value of 0.9 would mean that each body's velocity will drop 10% per second.
     /// The default value is 1.0, meaning no damping is applied.
     /// @note This damping value is different than those of cpDampedSpring and cpDampedRotarySpring.
-    this.damping = 1.0;
+    this.damping = 1;
     /// Speed threshold for a body to be considered idle.
     /// The default value of 0 means to let the space guess a good threshold based on gravity.
     this.idleSpeedThreshold = 0;
@@ -66,17 +66,16 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
     // IMPORTANT: this is different from the reference implementation, because the BBTree is considerable more difficult to port in JS.
     //this.staticShapes = new BBTree( undefined, undefined ); // TODO
     //this.activeShapes = new BBTree( undefined, this.staticShapes ); // TODO: implement BBTree
-    this.useSpatialHash(100, 100); // TODO: make this configurable
+    this.useSpatialHash(10, 10); // TODO: make this configurable
     if( this.activeShapes.setVelocityFunc ){ // Spatial hashes do not have a VelocityFunc?
       this.activeShapes.setVelocityFunc( Shape.prototype.velocityFunc ); 
     }
     
-    this.allocatedBuffers = [];
     this.bodies = [];
     this.sleepingComponents = [];
     this.rousedBodies = [];
     this.arbiters = [];
-    this.pooledArbiters = [];
+    //this.pooledArbiters = [];
     this.contactBuffersHead = undefined;
     this.cachedArbiters = new HashSet(0, function(shapes, arb){
       var a = shapes[0];
@@ -104,7 +103,6 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       this.constraints = undefined;
       this.cachedArbiters.free();
       this.arbiters = undefined;
-      this.pooledArbiters = undefined;
     },
     free: function(){ // TODO: same as above, just kept for now.
       this.destroy();
@@ -187,7 +185,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
           }
           arb.unthread();
           this.uncacheArbiter(arb);
-          this.pooledArbiters.push(arb);
+          //this.pooledArbiters.push(arb);
         }
         arb = next;
       }
@@ -272,7 +270,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
     },
     unlock: function(runPostStep){
       this.locked--;
-      if( !this.locked ){
+      if( !this.locked && runPostStep ){
         var waking = this.rousedBodies;
         for( var i =0 , count=waking.length; i < count; i++ ){
           this.activateBody(waking[i]);
@@ -436,13 +434,14 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       var arbiters = space.arbiters;
       for( var i = 0; i < arbiters.length; ++i ){
         var arb = arbiters[i];
-        arb.state = Arbiter.State.normal;
+        //arb.state = Arbiter.State.normal;
         // If both bodies are awake, unthread the arbiter from the contact graph
         if( !arb.body_a.isSleeping() && !arb.body_b.isSleeping() ){
           arb.unthread();
         }
       }
-      space.arbiters = [];
+      space.arbiters = arbiters = [];
+      
       // Integrate positions
       var bodies = space.bodies;
       for( var i = 0; i < bodies.length; ++i ){
@@ -461,8 +460,29 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
         space.processComponents(dt);
       }
       space.cachedArbiters.filter( Space.prototype.arbiterSetFilter, space ); // TODO ?
+      /*
+      space.cachedArbiters.filter(function(arb){
+        var ticks = space.stamp - arb.stamp;
+        
+        // was used last frame, but not this one
+        if(ticks >= 1 && arb.state != Arbiter.State.Cached){
+          arb.handler.separate(arb);
+          arb.state = Arbiter.State.Cached;
+        }
+        
+        if(ticks >= space.collisionPersistence){
+          arb.contacts = [];
+          return false;
+        }
+        
+        return true;
+      });
+      */
+      
+      
       var slop = space.collisionSlop;
       var biasCoef = 1 - Math.pow( space.collisionBias, dt );
+      
       for( var i = 0; i < arbiters.length; ++i ){ // TODO: arbiters type??
         arbiters[i].preStep(dt, slop, biasCoef);
       }
@@ -489,7 +509,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       }
       // Run the impulse solver
       for( var i = 0; i < space.iterations; ++i ){
-        for( var j = 0; j < arbiters.length; ++j ){
+        for( var j = 0; j <   arbiters.length; ++j ){
           arbiters[j].applyImpulse();
         }
         for( var j = 0; j < constraints.length; ++j ){
@@ -502,7 +522,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       for( var i = 0; i < arbiters.length; ++i ){
         var arb = arbiters[i];
         var handler = arb.handler;
-        handler.postSolve.apply(space, handler.data);
+        handler.postSolve.call(space, handler.data);
       }
       space.unlock();
       space.stamp++;
@@ -543,6 +563,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       this.contactBuffersHead.numContacts -= count;
     },
     
+    
     // callback from the spatial hash.
     collideShapes: function(/* a, */ b, space){ // NOTE: this = a
       var a = this;
@@ -552,9 +573,10 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       }
       var handler = space.lookupHandler(a.collision_type, b.collision_type);
       var sensor = a.sensor || b.sensor;
-      if( sensor && handler === CollisionHandler['default'] ){ // TODO: CollisionHandler
+      if( sensor && handler === defaultCollisionHandler ){ 
         return ;
       }
+      
       // Shape 'a' should have the lower shape type. (required by cpCollideShapes() )
       if(a.type > b.type){ 
         var temp = a;
@@ -562,19 +584,17 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
         b = temp;
       }
       // Narrow-phase collision detection.
-      var contacts = space.getArray();
+      var contacts = [];
       var numContacts = a.collideShapes(b, contacts);
       if( !numContacts ){
         return; // Shapes are not colliding.
       }
-      space.pushContacts(numContacts);
+      //space.pushContacts(numContacts);    
+      
       // Get an arbiter from space->arbiterSet for the two shapes.
       // This is where the persistant contact magic comes from.
       var shapePair = [ a, b ];
-      // #define CP_HASH_COEF (3344921057ul)
-      // #define CP_HASH_PAIR(A, B) ((cpHashValue)(A)*CP_HASH_COEF ^ (cpHashValue)(B)*CP_HASH_COEF)
-      var hash_coef = 3344921057;
-      var arbHashID = (a.hash * hash_coef) ^ (b.hash * hash_coef);  // TODO:  find better port solution to this hashing thingy..
+      var arbHashID = hash_pair(a.hash, b.hash); 
       var arb = space.cachedArbiters.insert(arbHashID, shapePair, space, Space.prototype.arbiterSetTrans);
       arb.update(contacts, /*numContacts,*/ handler, a, b); 
       
@@ -595,11 +615,11 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
         if( arb.state != Arbiter.State.ignore ){
           arb.state = Arbiter.State.normal;
         }
-        // Time stamp the arbiter so we know it was used recently.
-        arb.stamp = space.stamp;
       }
+      // Time stamp the arbiter so we know it was used recently.
+      arb.stamp = space.stamp;
     },
-    
+
     postStepCallbackSetIter: function(callback, space){
       callback.func.call(space, callback.obj, callback.data);
     },
@@ -634,14 +654,14 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
         return true;
       }
       // Arbiter was used last frame, but not this one
-      if( ticks >= 1 && arb.state != Arbiter.State.cached ){
+      if( ticks >= 1 && arb.state !== Arbiter.State.cached ){
         arb.callSeparate(space);
         arb.state = Arbiter.State.cached;
       }
       if( ticks >= space.collisionPersistence ){
         arb.contacts = undefined;
         arb.numContacts = 0;
-        space.pooledArbiters.push(arb);
+        //space.pooledArbiters.push(arb);
         return false;
       }
       return true;

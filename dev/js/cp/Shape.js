@@ -4,13 +4,13 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
     // #define CP_HASH_COEF (3344921057ul)
     // #define CP_HASH_PAIR(A, B) ((cpHashValue)(A)*CP_HASH_COEF ^ (cpHashValue)(B)*CP_HASH_COEF)
     var hash_coef = 3344921057;
-    var arbHashID = ( a * hash_coef) ^ ( b * hash_coef);  // TODO:  find better port solution to this hashing thingy..
+    var arbHashID = (( a * hash_coef) ^ ( b * hash_coef))&0x7FFFFFFF;  // TODO:  find better port solution to this hashing thingy..
     return arbHashID;
   };
 
   // Add contact points for circle to circle collisions.
   // Used by several collision tests.
-  var circle2circleQuery = function(p1, p2, r1, r2, con){ // NOTE: con will contain .contact attribute afterwards.
+  var circle2circleQuery = function(p1, p2, r1, r2, con){ 
     var mindist = r1 + r2;
     var delta = p2.sub(p1);
     var distsq = delta.lengthsq();
@@ -19,13 +19,12 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
     }
     var dist = Math.sqrt(distsq);
     // Allocate and initialize the contact.
-    con.contact = new Contact( p1.add( delta.mult(0.5 + (r1 - 0.5*mindist)/(dist?dist:Number.INFINITY)) ), 
-                              ( dist?delta.mult(1/dist):new Vect(1,0) ), 
+    con.push( new Contact( p1.add( delta.mult( 0.5 + (r1 - 0.5*mindist)/(dist ? dist : Number.POSITIVE_INFINITY) ) ), 
+                              (dist ? delta.mult(1.0/dist) : new Vect(1.0, 0.0)), 
                               dist-mindist, 
-                              0 );
+                              0 ) );
     return 1;
   };
-  
 
   // Collide circle shapes.
   var circle2circle = function( circ1, circ2, arr ){
@@ -72,14 +71,15 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
   // TODO: Comment me!
   var seg2poly = function( seg, poly, arr ){
     var axes = poly.tAxes;
+    
     var segD = seg.tn.dot(seg.ta);
-    var minNorm = poly.valueOnAxis(seg.tn, segD) - seg.r; // TODO: where the eff is this defined o_O"?
+    var minNorm = poly.valueOnAxis(seg.tn, segD) - seg.r; 
     var minNeg = poly.valueOnAxis( seg.tn.neg(), -segD) - seg.r;
     if( minNeg > 0 || minNorm > 0 ){
       return 0;
     }
     var mini = 0;
-    var poly_min = seg.valueOnAxis( axes.n, axes.d );
+    var poly_min = seg.valueOnAxis( axes[0].n, axes[0].d ); // TODO is axes[0] correctly ported?
     if( poly_min > 0 ){
       return 0;
     }
@@ -92,26 +92,28 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
         mini = i;
       }
     }
-    var num = 0;
+    var num = { num: 0 };
     var poly_n = axes[mini].n.neg();
+    
     var va = seg.ta.add( poly_n.mult(seg.r) );
     var vb = seg.tb.add( poly_n.mult(seg.r) );
     if( poly.containsVert(va) ){
-      new Contact( va, poly_n, poly_min, hash_pair(seg.shape.hashid, 0), arr.nextPoint({ num: num }) );
+      arr.push( new Contact( va, poly_n, poly_min, hash_pair(seg.hashid, 0), Contact.nextPoint(arr, num) ) );
     }
     if( poly.containsVert(vb) ){
-      new Contact( vb, poly_n, poly_min, hash_pair(seg.shape.hashid, 1), arr.nextPoint({ num: num }) );
+      arr.push( new Contact( vb, poly_n, poly_min, hash_pair(seg.hashid, 1),  Contact.nextPoint(arr, num) ) );
     }
     // Floating point precision problems here.
     // This will have to do for now.
     //	poly_min -= cp_collision_slop; // TODO is this needed anymore?
     if( minNorm >= poly_min || minNeg >= poly_min ){
       if( minNorm > minNeg ){
-        arr.findPointsBehindSeg(num, seg, poly, minNorm, 1.0); 
+        Contact.findPointsBehindSeg(arr, num, seg, poly, minNorm, 1.0); 
       }else{
-        arr.findPointsBehindSeg(num, seg, poly, minNeg, -1.0); 
+        Contact.findPointsBehindSeg(arr, num, seg, poly, minNeg, -1.0); 
       }
     }
+    
     // If no other collision points are found, try colliding endpoints.
     if( num === 0 ){
       var poly_a = poly.tVerts[mini];
@@ -130,19 +132,18 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
         return 1;
       }
     }
-    return num;
+    return num.num;
   };
-
 
   // This one is less gross, but still gross.
   // TODO: Comment me!
   var circle2poly = function(circ, poly, con){
     var axes = poly.tAxes;
     var mini = 0; 
-    var min = axes.n.dot(circ.tc) - axes.d - circ.r;
+    var min = axes[0].n.dot(circ.tc) - axes[0].d - circ.r;
     for( var i = 0; i < poly.numVerts; ++i ){
       var dist = axes[i].n.dot(circ.tc) - axes[i].d - circ.r;
-      if( dirs > 0 ){
+      if( dist > 0 ){
         return 0;
       }else if( dist > min ){
         min = dist;
@@ -155,10 +156,11 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
     var dta = n.cross(a);
     var dtb = n.cross(b);
     var dt = n.cross(circ.tc);
+    
     if( dt < dtb ){
       return circle2circleQuery(circ.tc, b, circ.r, 0, con);
     }else if( dt < dta ){
-      con.contact = new Contact( circ.tc.sub( n.mult(circ.r + min/2) ), n.neg(), min, 0 );
+      con.push( new Contact( circ.tc.sub( n.mult(circ.r + min/2) ), n.neg(), min, 0 ) );
       return 1;
     }else{
       return circle2circleQuery( circ.tc, a, circ.r, 0, con);
@@ -198,13 +200,13 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
     for( var i = 0; i < poly1.numVerts; ++i ){
       var v = poly1.tVerts[i];
       if( poly2.containsVertPartial( v, n.neg() ) ){
-        new Contact( v, n, dist, hash_pair(poly1.shape.hashid, i), arr.nextPoint({num:num}) );
+        new Contact( v, n, dist, hash_pair(poly1.hashid, i),  Contact.nextPoint(arr, { num: num }) );
       }
     }
     for( var i = 0; i < pol2.numVerts; ++i ){
       var v = poly2.tVerts[i];
       if( poly1.containsVertPartial(v, n) ) {
-        new Contact( v, n, dist, hash_pair(poly2.shape.hashid, i), arr.nextPoint({num:num}) );
+        new Contact( v, n, dist, hash_pair(poly2.hashid, i),  Contact.nextPoint(arr, { num: num }) );
       }
     }
     
@@ -219,13 +221,13 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
     for( var i = 0; i < poly1.numVerts; ++i ){
       var v = poly1.tVerts[i];
       if( poly2.containsVert(v) ){
-        new Contact( v, n, dist, hash_pair(poly1.shape.hashid, i), arr.nextPoint({num:num}) );
+        new Contact( v, n, dist, hash_pair(poly1.hashid, i),  Contact.nextPoint(arr, { num: num }) );
       }
     }
     for( var i = 0; i < poly2.numVerts; ++i ){
       var v = poly2.tVerts[i];
       if( poly1.containsVert(v) ){
-        new Contact( v, n, dist, hash_pair(poly2.shape.hashid, i), arr.nextPoint({num:num}) );
+        new Contact( v, n, dist, hash_pair(poly2.hashid, i),  Contact.nextPoint(arr, { num: num }) );
       }
     }
     
@@ -261,8 +263,8 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
     undefined,
     undefined,
     circle2poly,
-    seg2poly, // somewhat TODO
-    poly2poly, // TODO
+    seg2poly, 
+    poly2poly, 
   ];
 
 
@@ -274,11 +276,13 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
   };
   
   var idCounter = 0;
-
+  var hashCounter;
 
   var Shape = function(body){
     this.hashid = idCounter;
-    idCounter++;
+    this.hash = this.hashid; //  ~~(Math.random()*100000); //TODO: can i remove this, since it'S covered by hashid?
+   
+    idCounter = (idCounter + 49157)&0xFFFF;
     this.body = body;
     this.sensor = 0;
     this.e = 0;
@@ -287,7 +291,7 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
     this.collision_type = 0;
     this.group = 0; // CP_NO_GROUP
     this.layers = ~0;// CP_ALL_LAYERS
-    this.hash = Math.random(); // TODO: find a better solution to hash two shapes than to use random numbers :/
+    
   };
   
   Shape.resetIdCounter = function(){
@@ -404,7 +408,10 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
     },
     
     collideShapes: function(b, arr){
-      // Their shape types must be in order. TODO
+      // Their shape types must be in order.
+      if( this.type > b.type ){
+        throw "Collision shapes passed to Shape.collideShapes() are not sorted.";
+      }
       var cfunc = colfuncs[ this.type + b.type * ShapeType.NUM_SHAPES ];
       return cfunc?cfunc(this, b, arr) : 0;
     },
@@ -641,9 +648,17 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
     },
     getA: function(){
       return this.a;
+    },
+    
+    valueOnAxis: function(n, d){
+      var a = n.dot(this.ta) - this.r;
+      var b = n.dot(this.tb) - this.r;
+      return Math.min(a,b) - d;
     }
     
   });
+  
+  
   /**
    * @param body {object} a cpBody object
    * @param verts {array} array of cpVect objects (determines the length, drops the numVerts param)
@@ -653,7 +668,7 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
     if( !this.validate(verts) ){
       throw "Polygon is concave or has a reversed winding.";
     }
-    this.setUpVerts(pverts, offset);
+    this.setUpVerts(verts, offset);
     Shape.call(this, body);
     this.type = ShapeType.POLY_SHAPE;
   };
@@ -761,23 +776,65 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
       this.tVerts = [];
       this.axes = [];
       this.tAxes = [];
-      for( var i = 0; i < numVerts; ++i ){
+      for( var i = 0; i < this.numVerts; ++i ){
         var a = offset.add( verts[i] );
-        var b = offset.add( verts[(i+1)%numVerts] );
+        var b = offset.add( verts[(i+1)%this.numVerts] );
         var n = b.sub(a).perp().normalize();
         this.verts[i] = a;
         this.axes[i] = {
           n: n,
           d: n.dot(a)
         };
+        this.tAxes[i] = {}; //TODO: is that right? :>
       }
     },
     setVerts: function(verts, offset){
       this.setUpVerts(verts, offset);
+    },
+    
+    valueOnAxis: function(n, d){
+      var verts = this.tVerts;
+      var min = n.dot(verts[0]);
+      
+      for( var i = 1; i < this.numVerts; ++i ){
+        min = Math.min(min, n.dot(verts[i]));
+      }
+      
+      return min - d;
+    },
+    
+    containsVert: function(v){
+      var axes = this.tAxes;
+      
+      for( var i = 0; i < this.numVerts; ++i ){
+        var dist = axes[i].n.dot(v) - axes[i].d;
+        if( dist > 0 ){
+          return false;
+        }
+      }
+      
+      return true;
+    },
+    
+    containsVertPartial: function(v, n){
+      var axes = this.tAxes;
+      
+      for( var i = 0; i < this.numVerts; ++i ){
+        if( axes[i].n.dot(n) < 0 ){
+          continue;
+        }
+        var dist = axes[i].n.dot(v) - axes[i].d;
+        if( dist > 0 ){
+          return false;
+        }
+      }
+      
+      return true;
     }
+    
   });
-  
-  
+
+
   Shape.Box = function(body, widthOrBox, height){
     var box;
     if( arguments.length === 3 ){ // constructor: body, width, height
@@ -793,7 +850,7 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
       new Vect(box.r, box.t),
       new Vect(box.r, box.b)
     ];
-    return new Shape.Polygon(body, Vect.zero);
+    return new Shape.Polygon(body, verts, Vect.zero);
   };
   
   Shape.Box.momentFor = function(m, width, height){
@@ -803,95 +860,6 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
   return Shape;
 });
 
-
-
-/*
-cpFloat
-cpMomentForBox2(cpFloat m, cpBB box)
-{
-	cpFloat width = box.r - box.l;
-	cpFloat height = box.t - box.b;
-	cpVect offset = cpvmult(cpv(box.l + box.r, box.b + box.t), 0.5f);
-	
-	return cpMomentForBox(m, width, height) + m*cpvlengthsq(offset);
-}
-
-void
-cpRecenterPoly(const int numVerts, cpVect *verts){
-	cpVect centroid = cpCentroidForPoly(numVerts, verts);
-	
-	for(int i=0; i<numVerts; i++){
-		verts[i] = cpvsub(verts[i], centroid);
-	}
-}
-
-
-// static inline cpBool inUnitRange(cpFloat t){return (0.0f < t && t < 1.0f);} // TODO: what is this, I don't even..
-
-
-cpFloat
-cpMomentForSegment(cpFloat m, cpVect a, cpVect b)
-{
-	cpFloat length = cpvlength(cpvsub(b, a));
-	cpVect offset = cpvmult(cpvadd(a, b), 1.0f/2.0f);
-	
-	return m*(length*length/12.0f + cpvlengthsq(offset));
-}
-
-cpFloat
-cpAreaForSegment(cpVect a, cpVect b, cpFloat r)
-{
-	return r*((cpFloat)M_PI*r + 2.0f*cpvdist(a, b));
-}
-
-cpFloat
-cpMomentForPoly(cpFloat m, const int numVerts, const cpVect *verts, cpVect offset)
-{
-	cpFloat sum1 = 0.0f;
-	cpFloat sum2 = 0.0f;
-	for(int i=0; i<numVerts; i++){
-		cpVect v1 = cpvadd(verts[i], offset);
-		cpVect v2 = cpvadd(verts[(i+1)%numVerts], offset);
-		
-		cpFloat a = cpvcross(v2, v1);
-		cpFloat b = cpvdot(v1, v1) + cpvdot(v1, v2) + cpvdot(v2, v2);
-		
-		sum1 += a*b;
-		sum2 += a;
-	}
-	
-	return (m*sum1)/(6.0f*sum2);
-}
-
-cpFloat
-cpAreaForPoly(const int numVerts, const cpVect *verts)
-{
-	cpFloat area = 0.0f;
-	for(int i=0; i<numVerts; i++){
-		area += cpvcross(verts[i], verts[(i+1)%numVerts]);
-	}
-	
-	return -area/2.0f;
-}
-
-cpVect
-cpCentroidForPoly(const int numVerts, const cpVect *verts)
-{
-	cpFloat sum = 0.0f;
-	cpVect vsum = cpvzero;
-	
-	for(int i=0; i<numVerts; i++){
-		cpVect v1 = verts[i];
-		cpVect v2 = verts[(i+1)%numVerts];
-		cpFloat cross = cpvcross(v1, v2);
-		
-		sum += cross;
-		vsum = cpvadd(vsum, cpvmult(cpvadd(v1, v2), cross));
-	}
-	
-	return cpvmult(vsum, 1.0f/(3.0f*sum));
-}
-*/
 
 
 
