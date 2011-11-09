@@ -173,7 +173,7 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
   var findMSA = function(poly, axes,  num, out){
     var min_index = 0;
     
-    var min = poly.valueOnAxis(axes.n, axes.d);
+    var min = poly.valueOnAxis(axes[0].n, axes.d);
     if( min > 0 ){
       return -1;
     }
@@ -203,7 +203,7 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
         new Contact( v, n, dist, hash_pair(poly1.hashid, i),  Contact.nextPoint(arr, { num: num }) );
       }
     }
-    for( var i = 0; i < pol2.numVerts; ++i ){
+    for( var i = 0; i < poly2.numVerts; ++i ){
       var v = poly2.tVerts[i];
       if( poly1.containsVertPartial(v, n) ) {
         new Contact( v, n, dist, hash_pair(poly2.hashid, i),  Contact.nextPoint(arr, { num: num }) );

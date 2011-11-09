@@ -3,14 +3,12 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/Prime'], fun
   var HashSetBin = {};
   
   var HashSet = function(size, eqlFunc){
-    this.size = prime.next(size);
+    this.size = Number.INFINITY; //prime.last();
     this.entries = 0;
     this.eql = eqlFunc;
     this.default_value = undefined;
     // type: HashSetBin
-    this.table = {};//Array(this.size);
-    this.pooledBins = undefined;
-    this.allocatedBuffers = [];
+    this.table = {};
   };
   
   HashSet.prototype = {
@@ -19,52 +17,7 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/Prime'], fun
     },
     
     isFull: function(){
-      return this.entries >= this.size;
-    },
-    
-    resize: function(){
-      // Get the next approximate doubled prime.
-      var newSize = prime.next(this.size+1);
-      // Allocate a new table.
-      var newTable = {};
-      // Iterate over the chains.
-      for( var i = 0; i < this.size; i++ ){
-        // Rehash the bins into the new table.
-        var bin = this.table[i];
-        while( bin ){
-          var next = bin.next;
-          var idx = bin.hash%newSize;
-          bin.next = newTable[idx];
-          newTable[idx] = bin;
-          
-          bin = next;
-        }
-      }
-      this.table = newTable;
-      this.size = newSize;
-    },
-    
-    recycleBin: function(bin){
-      bin.next = this.pooledBins;
-      this.pooledBins = bin;
-      bin.elt = undefined;
-    },
-    
-    getUnusedBin: function(){
-      var bin = this.pooledBins;
-      if( bin ){
-        this.pooledBins = bin.next;
-        return bin;
-      }else{
-        // Pool is exhausted, make more
-        var count = 100; // TODO: configurable
-        var buffer = {}; // TODO
-        this.allocatedBuffers.push(buffer);
-        for( var i = 1; i < count; ++i ){
-          this.recycleBin({});
-        }
-        return buffer;
-      }
+      return false; //this.entries >= this.size;
     },
     
     count: function(){
@@ -72,101 +25,79 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/Prime'], fun
     },
     
     insert: function(hash, ptr, data, trans){
-      var idx = hash%this.size;
-      // Find the bin with the matching element.
-      var bin = this.table[idx];
-      while( bin && !this.eql(ptr, bin.elt) ){
-        bin = bin.next;
-      }
-      // create it if necessary.
+      
+      var bin = this.table[hash];
       if( !bin ){
-        bin = this.table[idx] = {
-          elt: (trans ? trans(ptr, data) : data),
-          hash: hash,
-          next: this.table[idx],
-        };
-        
-        this.entries++;
-        if(this.isFull()) this.resize();
-        /*
-        bin = this.getUnusedBin();
-        bin.hash = hash;
-        bin.elt = (trans ? trans(ptr, data) : data);
-        bin.next = this.table[idx];
-        this.table[idx] = bin;
-        this.entries++;
-        if( this.isFull() ){
-          this.resize();
-        }
-        */
+        bin = this.table[hash] = [];
       }
-      return bin.elt;
+      
+      for( var i = 0; i < bin.length; ++i ){
+        if( this.eql(ptr, bin[i].elt) ){
+          return bin[i].elt;
+        }
+      }
+      
+      var obj = {
+        elt: (trans ? trans(ptr, data) : data),
+        hash: hash
+      };
+      bin.push(obj);
+      this.entries++;
+
+      return obj.elt;
     },
     
     remove: function(hash, ptr){
-      var idx = hash%set.size;
-      var prev_ptr = this.table[idx];
-      var bin = this.table[idx];
-      
-      // Find the bin
-      while( bin && this.eql(ptr, bin.elt) ){
-        prev_ptr = bin.next;
-        bin = bin.next;
-      }
-      
-      // Remove it if it exists
+      var bin = this.table[hash];
       if( bin ){
-        // Update the previous linked list pointer
-        prev_ptr = bin.ext;
-        this.entries--;
-        var elt = bin.elt;
-        this.recycleBin(bin);
-        return elt;
+        for( var i = bin.length - 1; i >= 0; --i ){
+          var elt = bin[i].elt;
+          if( this.eql(ptr, elt) ){
+            bin.splice(i, 1);
+            this.entries--;
+            return elt;
+          }
+        }
       }
     },
     
     find: function(hash, ptr){
-      var idx = hash%this.size;
-      var bin = this.table[idx];
-      while( bin && !this.eql(ptr, bin.elt) ){
-        bin = bin.next;
+      var bin = this.table[hash];
+      if( bin ){
+        for( var i = 0; i < bin.length; ++i ){
+          if( this.eql(ptr, bin[i].elt) ){
+            return bin[i].elt;
+          }
+        }
       }
-      return (bin?bin.elt:this.default_value);
+      return this.default_value;
     },
     
     each: function(func, data){
-      for( var i in this.table ){
-        if( this.table.hasOwnProperty(i) ){
-          var bin = this.table[i];
-          while(bin){
-            var next = bin.next;
-            func(bin.elt, data);
-            bin = next;
+      for( var k in this.table ){
+        if( this.table.hasOwnProperty(k) ){
+          var bin = this.table[k];
+          for( var i = 0; bin && i < bin.length; ++i ){
+            func(bin[i].elt, data);
           }
         }
       }
     },
     
     filter: function(func, data){ // TODO: check if this works correctly (was some pointer magic)
-      for( var i in this.table ){
-        // The rest works similarly to cpHashSetRemove() above.
-        var prev_ptr = undefined;
-        var bin = this.table[i];
-        while(bin){
-          var next = bin.next;
-          if( bin && bin.elt && func(bin.elt, data) ){
-            prev_ptr = bin;
-          }else{
-            if( prev_ptr ){
-              prev_ptr = next;
-            }else{
-              this.table[i] = next;
+      for( var k in this.table ){
+        if( this.table.hasOwnProperty(k) ){
+          var bin = this.table[k];
+          if( bin ){
+            for( var i = bin.length-1; i >= 0; --i ){
+              if( func(bin[i].elt, data) ){
+                
+              }else{
+                bin.pop();
+                this.entries--;
+              }
             }
-            this.entries--;
-           
-            this.recycleBin(bin);
           }
-          bin = next;
         }
       }
     }

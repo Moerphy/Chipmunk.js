@@ -16,13 +16,13 @@ define(['cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Prime'], fun
   var rehash_helper = function(hand, hash){
     hash.handle(hand, hash.bbfunc.call(hand.obj));
   };
-  var segmentQuery_helper = function(hash, bin_ptr, obj, func, data){
+  var segmentQuery_helper = function(hash, /* array */ bin_ptr, obj, func, data){
     var t = 1;
     
     // let's hope that this works...
     var inline = function(){
-      for( var bin = bin_ptr; bin; bin = bin.next){
-        var hand = bin.handle;
+      for( var i = 0; bin_ptr && i < bin_ptr.length; ++i ){
+        var hand = bin_ptr[i];
         var other = hand.obj;
         
         // Skip over certain conditions
@@ -47,24 +47,20 @@ define(['cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Prime'], fun
   var eachHelper = function(hand, context){
     context.func.call(hand.obj, context.data);
   };
-  var remove_orphaned_handles = function(hash, bin_ptr){
-    var bin = bin_ptr;
-    while(bin){
-      var hand = bin.handle;
-      var next = bin.next;
-      if( !hand.obj ){
+  var remove_orphaned_handles = function(hash, /* array */ bin_ptr){
+    for( var i = 0; i < bin_ptr; ++i ){
+      var hand = bin_ptr[i];
+
+      if( !hand.obj ){ // TODO: check again after rewrite, no unlinking til then.
         // orphaned handle, unlink and recycle the bin
-        bin_ptr = bin.next;
-        hash.recycleBin(bin);
-        hand.release(hash.pooledHandles);
-      }else{
-        bin_ptr = bin.next;
+        //hash.recycleBin(bin);
+        //hand.release(hash.pooledHandles);
       }
     }
   };
-  var query_helper = function(hash, bin_ptr, obj, func, data){
-    for( var bin = bin_ptr; bin; bin = bin.next ){
-      var hand = bin.handle;
+  var query_helper = function(/* SpaceHash */ hash, /* array */ bin_ptr, obj, func, data){
+    for( var i = 0; bin_ptr && i < bin_ptr.length; ++i ){
+      var hand = bin_ptr[i];
       var other = hand.obj;
       
       if( hand.stamp === hash.stamp || obj === other ){
@@ -102,17 +98,14 @@ define(['cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Prime'], fun
         var idx = hash_func(i,j,n);
         var bin = table[idx];
         
-        if( bin && bin.containsHandle(hand) ){
+        if( containsHandle(bin, hand) ){
           continue;
         }
         hand.retain(); // this MUST be done first in case the object is removed in func()
         query_helper(hash, bin, obj, func, data);
         
-        var newBin = hash.getEmptyBin();
-        newBin.handle = hand;
-
-        newBin.next = bin;
-        table[idx] = newBin;
+        var newBin = hash.getBin(idx);
+        newBin.push(hand);
       }
     }
     // Increment the stamp for each object hashed.
@@ -150,42 +143,17 @@ define(['cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Prime'], fun
     hand.retain();
     return hand;
   };
-
-  /*
-  struct cpSpaceHashBin {
-    cpHandle *handle;
-    cpSpaceHashBin *next;
-  };
-  */
-  var bincounter = 0;
   
-  var SpaceHashBin = function(){
-    this.handle = undefined;
-    this.next = undefined;
-  };
-  SpaceHashBin.prototype = {
-
-    containsHandle: function(hand){
-      var bin = this;
-      var c = 0;
-      do{
-        if( bin.handle === hand ){
-          return true;
-        }
-        bin = bin.next;
-        
-        c++;
-      }while( bin );
-      //*
-      var bin = this;
-      for( var i = 0; i < c; ++i ){ // TODO: check why the fuck i have circular linked lists o_O
-        bin.checked = false;
-        bin = bin.next;
+  var containsHandle = function(list, hand){
+    for( var i = 0; list && i < list.length; ++i ){
+      var bin = list[i];
+      if( bin === hand ){
+        return true;
       }
-      //*/ // TODO ?
-      return false;
     }
+    return false;
   };
+ 
   
   /*
     struct cpSpaceHash {
@@ -216,18 +184,10 @@ define(['cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Prime'], fun
   };
   
   SpaceHash.prototype = util.extend( new SpatialIndex(), {
-    recycleBin: function(bin){
-      //bin.next = this.pooledBins;
-      //this.pooledBins = bin;
-    },
+
     clearTableCell: function(idx){
-      var bin = this.table[idx];
-      while(bin){
-        var next = bin.next;
-        bin.handle.release(this.pooledHandles);
-        this.recycleBin(bin);
-        bin = next;
-      }
+      //var bin = this.table[idx];
+      //bin.length = 0; // empty array
       this.table[idx] = undefined;
     },
     clearTable: function(){
@@ -238,15 +198,11 @@ define(['cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Prime'], fun
         }
       }
     },
-    getEmptyBin: function(){
-      var bin; // = this.pooledBins;
-      if( bin ){
-        this.pooledBins = bin.next;
-        return bin;
+    getBin: function(idx){ // TODO: check if pooling (like C-Chipmunk does) brings any benefits here.
+      var bin = this.table[idx];
+      if( !bin ){
+        bin = this.table[idx] = [];
       }
-      // TODO: pooling?
-      bin = new SpaceHashBin();
-      //this.allocatedBuffers.push(bin);
       return bin;
     },
     allocTable: function(numcells){
@@ -266,15 +222,14 @@ define(['cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Prime'], fun
           var idx = hash_func(i,j,n);
           var bin = this.table[idx];
           // Don't add an object twice to the same cell.
-          if(bin && bin.containsHandle(hand)){
+          if(containsHandle(bin, hand)){
             continue;
           }
           hand.retain();
           // Insert a new bin for the handle in this cell.
-          var newBin = this.getEmptyBin();
-          newBin.handle = hand;
-          newBin.next = bin;
-          this.table[idx] = newBin;
+          var newBin = this.getBin(idx);
+          newBin.push(hand);
+          //this.table[idx] = newBin;
         }
       }
     },

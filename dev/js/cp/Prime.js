@@ -29,8 +29,7 @@ define([], function(){
     201326611,
     402653189,
     805306457,
-    1610612741,
-    0,
+    1610612741
   ];
   return {
     next: function(n){
@@ -39,6 +38,10 @@ define([], function(){
         i++;
       }
       return primes[i];
+    },
+    
+    last: function(){
+      return primes[ primes.length - 1 ];
     }
   };
 });
