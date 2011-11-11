@@ -18,7 +18,14 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
   var defaultCollisionHandler = new CollisionHandler(0,0,alwaysCollide, alwaysCollide, nothing, nothing, undefined); 
 
   /// Basic Unit of Simulation in Chipmunk
-  var Space = function(){
+  var Space = function(options){
+    var defaultOptions = {
+      hashCellDim: 50
+    };
+    if( typeof options === 'object' ){
+      defaultOptions = util.extend( defaultOptions, options );
+    }
+    
     /// Number of iterations to use in the impulse solver to solve contacts.
     this.iterations = 10;
     /// Gravity to pass to rigid bodies when integrating velocity.
@@ -66,7 +73,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
     // IMPORTANT: this is different from the reference implementation, because the BBTree is considerable more difficult to port in JS.
     //this.staticShapes = new BBTree( undefined, undefined ); // TODO
     //this.activeShapes = new BBTree( undefined, this.staticShapes ); // TODO: implement BBTree
-    this.useSpatialHash(10, 10); // TODO: make this configurable
+    this.useSpatialHash(defaultOptions.hashCellDim, defaultOptions.hashCellDim); // TODO: make better config options.
     if( this.activeShapes.setVelocityFunc ){ // Spatial hashes do not have a VelocityFunc?
       this.activeShapes.setVelocityFunc( Shape.prototype.velocityFunc ); 
     }

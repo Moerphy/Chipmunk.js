@@ -173,7 +173,7 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
   var findMSA = function(poly, axes,  num, out){
     var min_index = 0;
     
-    var min = poly.valueOnAxis(axes[0].n, axes.d);
+    var min = poly.valueOnAxis(axes[0].n, axes[0].d);
     if( min > 0 ){
       return -1;
     }
@@ -200,13 +200,15 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
     for( var i = 0; i < poly1.numVerts; ++i ){
       var v = poly1.tVerts[i];
       if( poly2.containsVertPartial( v, n.neg() ) ){
-        new Contact( v, n, dist, hash_pair(poly1.hashid, i),  Contact.nextPoint(arr, { num: num }) );
+        num++;
+        arr.push( new Contact( v, n, dist, hash_pair(poly1.hashid, i)  ) );
       }
     }
     for( var i = 0; i < poly2.numVerts; ++i ){
       var v = poly2.tVerts[i];
       if( poly1.containsVertPartial(v, n) ) {
-        new Contact( v, n, dist, hash_pair(poly2.hashid, i),  Contact.nextPoint(arr, { num: num }) );
+        num++;
+        arr.push( new Contact( v, n, dist, hash_pair(poly2.hashid, i)  ) );
       }
     }
     
@@ -221,13 +223,15 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util'], function(Vect,
     for( var i = 0; i < poly1.numVerts; ++i ){
       var v = poly1.tVerts[i];
       if( poly2.containsVert(v) ){
-        new Contact( v, n, dist, hash_pair(poly1.hashid, i),  Contact.nextPoint(arr, { num: num }) );
+        num++;
+        arr.push( new Contact( v, n, dist, hash_pair(poly1.hashid, i) ) );
       }
     }
     for( var i = 0; i < poly2.numVerts; ++i ){
       var v = poly2.tVerts[i];
       if( poly1.containsVert(v) ){
-        new Contact( v, n, dist, hash_pair(poly2.hashid, i),  Contact.nextPoint(arr, { num: num }) );
+        num++;
+        arr.push( new Contact( v, n, dist, hash_pair(poly2.hashid, i) ) );
       }
     }
     
