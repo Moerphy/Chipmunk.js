@@ -52,7 +52,7 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/Prime'], fun
       if( bin ){
         for( var i = bin.length - 1; i >= 0; --i ){
           var elt = bin[i].elt;
-          if( this.eql(ptr, elt) ){
+          if( this.eql.call(elt, ptr) ){
             bin.splice(i, 1);
             this.entries--;
             return elt;
@@ -93,7 +93,7 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/Prime'], fun
               if( func(bin[i].elt, data) ){
                 
               }else{
-                bin.pop();
+                bin.splice(i, 1);
                 this.entries--;
               }
             }
