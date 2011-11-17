@@ -6,16 +6,14 @@ It's not a 1:1 port of the API, more of an OOP-Port. For instance <code>cpSpaceA
 
 h2. Status
 
-Currently most of the API is ported. As far as I know off the top of my head the only gaps are in Constraints (pretty much nothing done) and Spatial Indexing (only SpatialHash available).
+Currently most of the API is ported. As far as I know off the top of my head the only gaps are in Constraints (much nothing done there) and Spatial Indexing (only SpatialHash available so far).
 
 Since most of the code is similiar to the original C version there still is a lot of potential (and probably need) for optimizing it for Javascript.
-Besides that there is still a lot of testing and cleanup to do so it's not recommend to use the lib in any bigger projects yet. 
+
+*It's not recommend to use Chipmunk.js yet, since it's largely untested and unstable (for instance putting components to sleep tends to run into an infinite loop) and still in a very early alpha stage!*
 
 
 h2. Requirements
 
 Until now it only requires a AMD compatible scriptloader like requireJS or curl.js.
-
-
-h2. Questions / Issues
 
