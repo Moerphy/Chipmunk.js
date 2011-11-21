@@ -16,15 +16,8 @@ typedef struct cpContactBuffer {
 
  */
 
-define([], function(){
+define(['cp/Hash'], function(hash_pair){
   "use strict";
-  var hash_pair = function(a, b){
-    // #define CP_HASH_COEF (3344921057ul)
-    // #define CP_HASH_PAIR(A, B) ((cpHashValue)(A)*CP_HASH_COEF ^ (cpHashValue)(B)*CP_HASH_COEF)
-    var hash_coef = 3344921057;
-    var arbHashID = ( a * hash_coef) ^ ( b * hash_coef);  // TODO:  find better port solution to this hashing thingy..
-    return arbHashID;
-  };
   var MAX_CONTACTS_PER_ARBITER = 100; // TODO: configurable
   
   var Contact = function(/* Vect */ p, /* Vect */ n, /* number */ dist, /* number */ hash, /* optional object*/ o){

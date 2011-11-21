@@ -5,6 +5,8 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
   /// They are also used in conjuction with collision handler callbacks
   /// allowing you to retrieve information on the collision and control it.
 
+  var counter = 0;
+
   var MAX_CONTACTS_PER_ARBITER = 10;
   /// @private
   var ArbiterState = {
@@ -31,8 +33,25 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
     this.b = b;
     this.body_b = b.body;
     
-    this.thread_a = {};
-    this.thread_b = {}; // contains: .next, .prev
+    this.counter = ++counter;
+    
+    this.thread_a = {
+      get next(){
+        return this._next;
+      },
+      set next(s){
+        this._next = s;
+      }
+      
+    };
+    this.thread_b = {
+      get next(){
+        return this._next;
+      },
+      set next(s){
+        this._next = s;
+      }
+    };
     
     this.stamp = 0;
     this.state = ArbiterState.firstColl;
@@ -43,7 +62,6 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
   Arbiter.State = ArbiterState;
  
   Arbiter.prototype = {
-
     unthreadHelper: function(body){
       var thread = this.threadForBody(body);
       var prev = thread.prev;
@@ -62,9 +80,10 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
       thread.next = undefined;
     },
     
+    
     unthread: function(){
-      this.unthreadHelper(this, this.body_a);
-      this.unthreadHelper(this, this.body_b);
+      this.unthreadHelper(this.body_a);
+      this.unthreadHelper(this.body_b);
     },
     
     getNormal: function(i){
@@ -247,7 +266,7 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
     },
     
     threadForBody: function(body){
-      return (this.body_a == body ? this.thread_a : this.thread_b);
+      return (this.body_a === body ? this.thread_a : this.thread_b);
     },
     
     getElasticity: function(){
@@ -327,9 +346,14 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
     },
     
     next: function(body){
-      return (this.body_a === body? this.thread_a.next : this.thread_b.next);
+      var arb =  (this.body_a === body? this.thread_a.next : this.thread_b.next);
+      if( this === arb ){
+        arb = undefined;
+      }
+      return arb;
     }
   };
  
   return Arbiter;
 });
+

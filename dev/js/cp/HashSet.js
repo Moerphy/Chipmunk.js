@@ -84,7 +84,7 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/Prime'], fun
       }
     },
     
-    filter: function(func, data){ // TODO: check if this works correctly (was some pointer magic)
+    filter: function(func, data){ 
       for( var k in this.table ){
         if( this.table.hasOwnProperty(k) ){
           var bin = this.table[k];
@@ -101,8 +101,6 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/Prime'], fun
         }
       }
     }
-
-    
   };
   
   

@@ -19,6 +19,10 @@ define([], {
     if( pos >= 0 ){
       array.splice(pos, 1);
     }
+  },
+  
+  contains: function(array, obj){
+    return this.indexOf(array, obj) >= 0;
   }
 });
 

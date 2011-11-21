@@ -11,6 +11,7 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
   };
   
   
+  
   /// Chipmunk's rigid body struct.
   var Body = function(mass, moment){   
     /// Function that is called to integrate the body's velocity. (Defaults to cpBodyUpdateVelocity)
@@ -50,16 +51,18 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     /// Rotation of the body around it's center of gravity in radians.
     /// Must agree with cpBody.rot! Use cpBodySetAngle() when changing the angle for this reason.
     this.setAngle(0);
+    
+    this.arbiterList = undefined;
   };
   
   Body.prototype = {
     
     /**
      *  Returns true if the body is sleeping.
-     * (false is node.root is set)
+     * (true is node.root is set)
      */
     isSleeping: function(){
-      return this.node.root !== undefined;
+      return !!this.node.root;
     },
     
     /**
@@ -221,13 +224,14 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
       }
     },
     
-    // TODO. Implemented in cpSpaceComponent.c
     activate: function(){
       if( !this.isRogue() ){
-        this.node.idleTime = 0;
-        if( this.componentRoot() ){
-          this.componentRoot().activate();
+        
+        var root = this.componentRoot();
+        if( root ){
+          root.componentActivate();
         }
+        this.node.idleTime = 0;
       }
     },
     // #define CP_BODY_FOREACH_ARBITER(bdy, var) for(cpArbiter *var = bdy->arbiterList; var; var = cpArbiterNext(var, bdy))
@@ -254,8 +258,8 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
       assert.hard(!space.locked, "Bodies cannot be put to sleep during a query or a call to cpSpaceStep(). Put these calls into a post-step callback.");
       assert.hard(group === undefined || group.isSleeping(), "Cannot use a non-sleeping body as a group identifier.");
 	
-      if(body.isSleeping()){
-        assert.hard(body.componentRoot() === group.componentRoot(), "The body is already sleeping and it's group cannot be reassigned.");
+      if(this.isSleeping()){
+        assert.hard(this.componentRoot() === group.componentRoot(), "The body is already sleeping and it's group cannot be reassigned.");
       }
         
       // #define CP_BODY_FOREACH_SHAPE(body, var)	for(cpShape *var = body->shapeList; var; var = var->next)
@@ -275,27 +279,6 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
       }
       arrays.deleteObj(space.bodies, this);
     
-    },
-
-    componentRoot: function(){
-      return (this.node ? this.node.root : undefined);
-    },
-    
-    componentActivate: function(){
-        if( !this.isSleeping() ){
-          return;
-        }
-        var space = this.space;
-        var body = this;
-        
-        while(body){
-          var next = body.node.next;
-          body.node.root = undefined;
-          body.node.next = undefined;
-          space.activateBody(body);
-          body = next;
-        }
-        arrays.deleteObj(space.sleepingComponents, this);
     },
     
     getMass: function(){
@@ -372,8 +355,87 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     setForce: function(w){
       this.activate();
       this.f = w;
-    }
+    },
     
+    
+    componentRoot: function(){
+      return this.node.root;
+    },
+    
+    componentActivate: function(){
+        if( !this.isSleeping() ){
+          return;
+        }
+        assert.soft( !this.isRogue(), "Internal Error: ComponentActivate() called on a rogue body." );
+        
+        var space = this.space;
+        var body = this;
+        
+        while(body){
+          var next = body.node.next;
+          body.node.root = undefined;
+          body.node.next = undefined;
+          space.activateBody(body);
+          body = next;
+        }
+        arrays.deleteObj(space.sleepingComponents, this);
+    },
+    
+    componentActive: function(threshold){
+      for( var body = this; body; body = body.node.next ){
+        if( body.node.idleTime < threshold ){
+          return true;
+        }
+      }
+      return false;
+    },
+    
+    componentAdd: function(/* root, */ body){
+      body.node.root = this;
+
+      if(body !== this){
+        body.node.next = this.node.next;
+        this.node.next = body;
+      }
+    },
+    
+    floodFillComponent: function(body){
+      var root = this;
+
+      if( !body.isStatic() && !body.isRogue() ){
+        var other_root = body.componentRoot();
+        if( !other_root ){
+          root.componentAdd(body);
+          
+          //#define CP_BODY_FOREACH_ARBITER(bdy, var)	for(cpArbiter *var = bdy->arbiterList; var; var = cpArbiterNext(var, bdy))
+          //#define CP_BODY_FOREACH_CONSTRAINT(bdy, var) for(cpConstraint *var = bdy->constraintList; var; var = cpConstraintNext(var, bdy))
+          for( var arb = body.arbiterList; arb; arb = arb.next(body) ){
+            root.floodFillComponent( (body === arb.body_a)?arb.body_b:arb.body_a );
+          }
+          for( var constraint = body.constraintList; constraint; constraint = constraint.next(body) ){
+            root.floodFillComponent( (body === constraint.a)?constraint.b:constraint.a );
+          }
+
+        }else{
+          assert.soft(other_root === root, "Internal Error: Inconsistency dectected in the contact graph.");
+        }
+      }
+    },
+    
+    pushArbiter: function(arb){
+      assert.soft( !arb.threadForBody(this).next, "Internal Error: Dangling contact graph pointers detected. (A)" );
+      assert.soft( !arb.threadForBody(this).prev, "Internal Error: Dangling contact graph pointers detected. (B)" );
+      
+      var next = this.arbiterList;
+      assert.soft( !next || !next.threadForBody(this).prev, "Internal Error: Dangling contact graph pointers detected. (C)" );
+      arb.threadForBody(this).next = next;
+      if( next ){
+        next.threadForBody(this).prev = arb;
+      }
+      this.arbiterList = arb;
+
+    }
+	
   };
   
   Body.Static = function(){

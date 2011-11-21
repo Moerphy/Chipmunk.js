@@ -24,7 +24,6 @@ define(['cp/Vect', /*'chipmunk/private'*/], function(Vect, cpPrivate){
 
     /**
      * Returns true if @c other lies completely within @c bb.
-     * TODO
      */
     containsBB: function( other ){
       return (this.l <= other.l && this.r >= other.r && this.b <= other.b && this.t >= other.t);

@@ -54,7 +54,7 @@ define(['cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Prime'], fun
       if( !hand.obj ){ // TODO: check again after rewrite, no unlinking til then.
         // orphaned handle, unlink and recycle the bin
         //hash.recycleBin(bin);
-        //hand.release(hash.pooledHandles);
+        hand.release(hash.pooledHandles);
       }
     }
   };
@@ -325,17 +325,17 @@ define(['cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Prime'], fun
       
       if( b.x > a.x ){
         x_inc = 1;
-        temp_h = Math.floor(a.x + 1) - a.x;
+        temp_h = ~~(a.x + 1) - a.x;
       }else{
         x_inc = -1;
-        temp_h = a.x - Math.floor(a.x);
+        temp_h = a.x - ~~(a.x);
       }
       if( b.y > a.y ){
         y_inc = 1;
-        temp_v = Math.floor(a.y + 1) - a.y;
+        temp_v = ~~(a.y + 1) - a.y;
       }else{
         y_inc = -1;
-        temp_v = a.y - Math.floor(a.y);
+        temp_v = a.y - ~~(a.y);
       }
       // Division by zero is *very* slow on ARM
       var dx = Math.abs(b.x - a.x);
