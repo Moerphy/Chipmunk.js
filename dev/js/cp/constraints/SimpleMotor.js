@@ -59,6 +59,14 @@ define(['cp/constraints/Constraint', 'cp/constraints/util', 'cp/cpf'], function(
     
     getImpulse: function(){
       return Math.abs( this.jAcc );
+    },
+    
+    getRate: function(){
+      return this.rate;
+    },
+    
+    setRate: function(rate){
+      this.rate = rate;
     }
 
   });
