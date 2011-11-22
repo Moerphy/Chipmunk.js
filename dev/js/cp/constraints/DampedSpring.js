@@ -2,13 +2,13 @@ define(['cp/constraints/Constraint', 'cp/constraints/util', 'cp/cpf'], function(
   "use strict";
   
   /**
-   * @param {cp/Body} a
-   * @param {cp/Body} b
-   * @param {cp/Vect} anchr1
-   * @param {cp/Vect} anchr2
-   * @param {Number} restLength
-   * @param {Number} stiffness
-   * @param {Number} damping
+   * @param {cp/Body} a the first body to connect
+   * @param {cp/Body} b the second body to connect
+   * @param {cp/Vect} anchr1 the anchor point on the first body
+   * @param {cp/Vect} anchr2 the anchor point on the second body
+   * @param {Number} restLength the length the spring wants to be
+   * @param {Number} stiffness is the spring constant (Young's modulus)
+   * @param {Number} damping how soft to make the damping of the spring.
    */
   var DampedSpring = function(a, b, anchr1, anchr2, restLength, stiffness, damping){
     Constraint.call(this, a, b);
@@ -113,7 +113,7 @@ define(['cp/constraints/Constraint', 'cp/constraints/util', 'cp/cpf'], function(
     },
     setDamping: function(value){
       this.damping = value;
-    },
+    }
   });
   
   return DampedSpring;
