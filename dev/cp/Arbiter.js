@@ -35,23 +35,8 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
     
     this.counter = ++counter;
     
-    this.thread_a = {
-      get next(){
-        return this._next;
-      },
-      set next(s){
-        this._next = s;
-      }
-      
-    };
-    this.thread_b = {
-      get next(){
-        return this._next;
-      },
-      set next(s){
-        this._next = s;
-      }
-    };
+    this.thread_a = {};
+    this.thread_b = {};
     
     this.stamp = 0;
     this.state = ArbiterState.firstColl;
