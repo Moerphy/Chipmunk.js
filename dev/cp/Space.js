@@ -296,8 +296,8 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       
       this.unlock();
     },
-    eachShapeIterator: function(shape, context){
-      context.func(shape, context.data);
+    eachShapeIterator: function(/*shape, */context){
+      context.func(this, context.data);
     },
     
     eachShape: function( func, data ){

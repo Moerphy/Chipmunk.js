@@ -391,6 +391,13 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     
   });
   
+  Shape.Segment.momentFor = function(mass, a, b){
+    var length = b.sub(a).length();
+    var offset = a.add(b).mult( 0.5 );
+
+    return mass*(length*length/12 + offset.lengthsq());
+  };
+  
   
   /**
    * @param body {object} a cpBody object
