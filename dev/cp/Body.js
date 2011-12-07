@@ -74,7 +74,7 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     },
     
     isRogue: function(){
-      this.space === undefined;
+      return !this.space; // not added to space == rogue
     },
     
     /**

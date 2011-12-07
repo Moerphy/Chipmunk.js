@@ -1,5 +1,5 @@
-define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceHash', 'cp/ContactBuffer', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/CollisionHandler', 'cp/Hash', 'cp/assert'], 
-    function(Body, Vect, Shape, Arbiter, HashSet, SpaceHash, ContactBuffer, util,  cpf, arrays, CollisionHandler, hash_pair, assert){
+define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceHash', 'cp/BBTree', 'cp/ContactBuffer', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/CollisionHandler', 'cp/Hash', 'cp/assert'], 
+    function(Body, Vect, Shape, Arbiter, HashSet, SpaceHash, BBTree, ContactBuffer, util,  cpf, arrays, CollisionHandler, hash_pair, assert){
   "use strict";
 
   // Default collision functions.
@@ -63,12 +63,18 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
     this.stamp = 0;
     
     // IMPORTANT: this is different from the reference implementation, because the BBTree is considerable more difficult to port in JS.
-    //this.staticShapes = new BBTree( undefined, undefined ); // TODO
-    //this.activeShapes = new BBTree( undefined, this.staticShapes ); // TODO: implement BBTree
+    /*
+    this.staticShapes = new BBTree( Shape.prototype.getBB, undefined );
+    this.activeShapes = new BBTree( Shape.prototype.getBB, this.staticShapes ); 
+    //*/
+    
+    //*
     this.useSpatialHash(defaultOptions.hashCellDim, defaultOptions.hashCellDim); // TODO: make better config options.
+    //*/
     if( this.activeShapes.setVelocityFunc ){ // Spatial hashes do not have a VelocityFunc?
       this.activeShapes.setVelocityFunc( Shape.prototype.velocityFunc ); 
     }
+    
     
     this.bodies = [];
     this.sleepingComponents = [];
@@ -149,8 +155,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       var body = shape.body;
       body.addShape(shape);
       shape.update( body.p, body.rot );
-      //this.staticShapes.insert( shape, shape.hashid );
-      this.staticShapes.push(shape);
+      this.staticShapes.insert(shape, shape.hashid);
       shape.space = this;
       return shape;
     },

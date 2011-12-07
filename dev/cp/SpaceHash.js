@@ -172,8 +172,8 @@ define(['cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Prime'], fun
     cpTimestamp stamp;
   };
   */
-  var SpaceHash = function(celldim, numcells, bbfunc){
-    SpatialIndex.call(this, bbfunc);
+  var SpaceHash = function(celldim, numcells, bbfunc, staticIndex){
+    SpatialIndex.call(this, bbfunc, staticIndex);
     this.allocTable(prime.next());
     this.celldim = celldim;
     this.handleSet = new HashSet( 0, Handle.prototype.setEql  );

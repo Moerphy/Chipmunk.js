@@ -29,7 +29,7 @@ define(['cp/Prime'], function(prime){
         } */
         var context = {
           bbfunc: this.bbfunc,
-          staticIndex: this,
+          staticIndex: this.staticIndex,
           queryFunc: func,
           data: data
         };
