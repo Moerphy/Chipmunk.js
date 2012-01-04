@@ -1,3 +1,6 @@
+/**
+ * @namespace cp
+ */
 define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceHash', 'cp/BBTree', 'cp/ContactBuffer', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/CollisionHandler', 'cp/Hash', 'cp/assert'], 
     function(Body, Vect, Shape, Arbiter, HashSet, SpaceHash, BBTree, ContactBuffer, util,  cpf, arrays, CollisionHandler, hash_pair, assert){
   "use strict";
@@ -9,7 +12,11 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
   // cpCollisionHandler cpDefaultCollisionHandler = {0, 0, alwaysCollide, alwaysCollide, nothing, nothing, NULL};
   var defaultCollisionHandler = new CollisionHandler(0,0,alwaysCollide, alwaysCollide, nothing, nothing, undefined); 
 
-  /// Basic Unit of Simulation in Chipmunk
+  /**
+   * Basic Unit of Simulation in Chipmunk.
+   * @class Space
+   * @param {object} options
+   */
   var Space = function(options){
     var defaultOptions = {
       hashCellDim: 50
@@ -98,6 +105,9 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
     this.postStepCallbacks = undefined;
   };
  
+ /**
+  * @namespace cp.Space.prototype
+  */
   Space.prototype = {
 
     // TODO check if I can kick out the destroy functions.
@@ -113,6 +123,19 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       this.destroy();
     },
     
+    /**
+     * Set a collision handler to handle specific collision types. 
+      The methods are called only when shapes with the specified collisionTypes collide.
+      typeA and typeB should be the same object references set to cp.Shape.collisionType. They can be any uniquely identifying object.
+     * @function addCollisionHandler
+     * @param {number|string} a
+     * @param {number|string} b
+     * @param {function} begin a calback function that is called at the beginning of a collision. Could look like this: function(space, data){ return true; } In the callback the context ("this") is set to the arbiter that handles the collision. Returning false from the callback ignores the collision.
+     * @param {function} presolve a calback function that is called before the collision is solved. Callback is the same as for begin
+     * @param {function} postsolve a calback function that is called after the collision is solved. Could look like this: function(space, data){} In the callback the context ("this") is set to the arbiter that handles the collision. 
+     * @param {function} seperate A callback that is called when the shape seperate again. Callback is the same as for postsolve
+     * @param {object} [data=undefined] optional data object that will be passed to the callbacks.
+     */
     addCollisionHandler: function(a, b, begin, presolve, postsolve, separate, data){
       // Remove any old function so the new one will get added.
       this.removeCollisionHandler(a,b);
@@ -121,9 +144,14 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
         // Transformation function for collisionHandlers.
         return handler.clone();
       }); 
-      
     },
     
+    /**
+     * Remove a collision handler for a given collision type pair.
+     * @function removeCollisionHandler
+     * @param {number|string} a
+     * @param {number|string} b
+     */
     removeCollisionHandler: function(a, b){
       var ids = {
         a: a,
@@ -132,12 +160,28 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       var oldHandler = this.collisionHandlers.remove( hash_pair(a,b), ids ); // TODO
     },
     
+    /**
+     * Register a default collision handler to be used when no specific collision handler is found. The space is given a default handler when created that returns true for all collisions in begin() and preSolve() and does nothing in the postSolve() and separate() callbacks.
+     * @function setDefaultCollisionHandler
+     * @param {function} begin a calback function that is called at the beginning of a collision. Could look like this: function(space, data){ return true; } In the callback the context ("this") is set to the arbiter that handles the collision. Returning false from the callback ignores the collision.
+     * @param {function} presolve a calback function that is called before the collision is solved. Callback is the same as for begin
+     * @param {function} postsolve a calback function that is called after the collision is solved. Could look like this: function(space, data){} In the callback the context ("this") is set to the arbiter that handles the collision. 
+     * @param {function} seperate A callback that is called when the shape seperate again. Callback is the same as for postsolve
+     * @param {object} [data=undefined] optional data object that will be passed to the callbacks.
+     */
     setDefaultCollisionHandler: function(begin, preSolve, postSolve, separate, data){
       var handler = new CollisionHandler( 0, 0, begin || alwaysCollide, preSolve || alwaysCollide, postSolve||nothing, separate||nothing, data );
       this.defaultHandler = handler;
       this.collisionHandlers.setDefaultValue(this.defaultHandler);
     },
     
+    /**
+     * Add shape to the space. The add function cannot be called from within a callback other than a postStep() callback (which is different than a postSolve() callback!). Attempting to add or remove objects from the space while cpSpaceStep() is still executing will throw an assertion. 
+     * The add functions return the thing being added so that you can create and add something in one line. 
+     * @function addShape
+     * @param {cp.Shape} shape
+     * @return {cp.Shape} the input shape
+     */
     addShape: function(shape){
       var body = shape.body;
       if( body.isStatic() ){
@@ -151,6 +195,13 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       return shape;
     },
     
+    /**
+     * Shapes attached to static bodies are automatically treated as static. There isn’t really a good reason to explicitly add static shapes anymore.
+     * Used internally by addShape().
+     * @function addStaticShape
+     * @deprecated
+     * @private
+     */
     addStaticShape: function(shape){
       var body = shape.body;
       body.addShape(shape);
@@ -159,11 +210,25 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       shape.space = this;
       return shape;
     },
+    
+    /**
+     * Adds a body to the space.
+     * @function addBody
+     * @param {cp.Body} body 
+     * @return {cp.Body} the input body
+     */
     addBody: function(body){
       this.bodies.push(body);
       body.space = this;
       return body;
     },
+    
+    /**
+     * Adds a Constraint to the space.
+     * @function addConstraint
+     * @param {cp.constraints.Constraint} constraint
+     * @return {cp.constraints.Constraint} the input constraint
+     */
     addConstraint: function(constraint){
       constraint.a.activate();
       constraint.b.activate();
@@ -180,46 +245,39 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
     },
     
     filterArbiters: function(body, filter){
-      var arb = body.arbiterList;
-      while( arb ){
-        var next = arb.next(body);
-        if( filter === undefined || filter === arb.a || filter === arb.b ){
-          if( arb.state != Arbiter.State.cached ){
-            arb.callSeparate(this);
-          }
-          arb.unthread();
-          this.uncacheArbiter(arb);
-          //this.pooledArbiters.push(arb);
-        }
-        arb = next;
-      }
-      // TODO see note at cpSpaceArbiterSetFilter()
-      // When just removing the body, so we need to filter all cached arbiters to avoid dangling pointers.
-      /*
-      struct arbiterFilterContext {
-        cpSpace *space;
-        cpBody *body;
+      var context = {
+        space: this,
+        body: body,
+        shape: filter
       };
-      */
-      if( filter === undefined ){
-        var context = {
-          space: this,
-          body: body
-        };
-        this.cachedArbiters.filter( this.filterRemovedBody, context ); 
-      }
+      this.cachedArbiters.filter( this.cachedArbitersFilter, context ); 
     },
     
-    filterRemovedBody: function( arb, context ){
+
+    cachedArbitersFilter: function( arb, context ){
+      var shape = context.shape;
       var body = context.body;
-      if( body === arb.body_a || body === arb.body_b ){
+      
+      // Match on the filter shape, or if it's NULL the filter body
+      if( (body === arb.body_a && (shape === arb.a || !shape)) || 
+          ( body === arb.body_b && (shape === arb.b || !shape)) ){
+        // Call separate when removing shapes.
+        if( shape && arb.state !== Arbiter.State.cached ){
+          arb.callSeparate(context.space);
+        }
+        arb.unthread();
         arrays.deleteObj( context.space.arbiters, arb );
-        context.space.arbiters.push(arb);
+        //context.space.pooledArbiters.push(arb);
         return false;
       }
       return true;
     },
     
+    /**
+     * Remove a shape from the space again.
+     * @function removeShape
+     * @param {cp.Shape} shape
+     */
     removeShape: function(shape){
       var body = shape.body;
       if( body.isStatic() ){
@@ -233,6 +291,14 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       }
     },
     
+    /**
+     * Removes a static shape from the space again. Deprecated since this is handled by removeShape() internally.
+     * This function should be treated as private.
+     * @function removeStaticShape
+     * @param {cp.Shape} shape
+     * @deprecated
+     * @private
+     */
     removeStaticShape: function(shape){
       var body = shape.body;
       body.activateStatic(shape);
@@ -242,6 +308,11 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       shape.space = undefined;
     },
     
+    /**
+     * Removes a body from the space again.
+     * @function removeBody
+     * @param {cp.Body} body
+     */
     removeBody: function(body){
       body.activate();
       this.filterArbiters(body, undefined);
@@ -249,6 +320,11 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       body.space = undefined;
     },
     
+    /**
+     * Removes a constraint from the space again
+     * @function removeConstraint
+     * @param {cp.constraints.Constraint} constraint
+     */
     removeConstraint: function(constraint){
       constraint.a.activate();
       constraint.b.activate();
@@ -258,17 +334,28 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       constraint.space = undefined;
     },
     
-    // TODO: maybe point all three methods to the same function, since they behave the same
+    /**
+     * @function containsShape
+     * @param {cp.Shape} shape
+     */
     containsShape: function(shape){
       return (shape.space === this);
     },
+    /**
+     * @function containsBody
+     * @param {cp.Body} body
+     */
     containsBody: function(body){
       return (body.space === this);
     },
+    /**
+     * @function containsConstraint
+     * @param {cp.constraints.Constraint} constraint
+     */
     containsConstraint: function(constraint){
       return (constraint.space === this);
     },
-    
+
     lock: function(){
       this.locked++;
     },
@@ -284,6 +371,12 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       }
     },
     
+    /**
+     * Call func for each body in the space also passing along your data pointer. Sleeping bodies are included, but static and rogue bodies are not as they aren’t added to the space.
+     * @function eachBody
+     * @param {function} func
+     * @param {object} data
+     */
     eachBody: function(func, data){
       this.lock();
       
@@ -305,6 +398,12 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       context.func(this, context.data);
     },
     
+    /**
+     * Call func for each shape in the space also passing along your data pointer. Sleeping and static shapes are included.
+     * @function eachShape
+     * @param {function} func
+     * @param {object} data
+     */
     eachShape: function( func, data ){
       this.lock();
       var context = {
@@ -316,6 +415,12 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       this.unlock(true);
     },  
     
+    /**
+     * Call func for each constraint in the space also passing along your data pointer.
+     * @function eachConstraint
+     * @param {function} func
+     * @param {object} data
+     */
     eachConstraint: function(func, data){
       this.lock();
       var constraints = this.constraints;
@@ -325,11 +430,20 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       this.unlock(true);
     },
     
+    /**
+     * Reindex all static shapes. Generally updating only the shapes that changed is faster.
+     * @function reindexStatic
+     */
     reindexStatic: function(){
       this.staticShapes.each( Shape.prototype.updateBBCache, undefined );
       this.staticShapes.reindex();
     },
     
+    /**
+     * Reindex a specific shape.
+     * @function reindexShape
+     * @param {cp.Shape} shape
+     */
     reindexShape: function(shape){
       var body = shape.body;
       shape.update(body.p, body.rot);
@@ -338,12 +452,24 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       this.staticShapes.reindexObject(shape, shape.hashid);
     },
     
+    /**
+     *  Reindex all the shapes for a certain body.
+     * @function reindexShapesForBody
+     * @param {cp.Body} body
+     */
     reindexShapesForBody: function(body){
       for(var var1 = body.shapeList; var1; var1 = var1.next){
         this.reindexShape(var1);
       }
     },
     
+    /**
+     * Switch the space to use a spatial hash instead of the bounding box tree.
+     * The spatial hash data is fairly size sensitive. 
+     * @function useSpatialHash
+     * @param {number} dim the size of the hash cells. Setting dim to the average collision shape size is likely to give the best performance. Setting dim too small will cause the shape to be inserted into many cells, setting it too low will cause too many objects into the same hash slot.
+     * @param {number} count the suggested minimum number of cells in the hash table. If there are too few cells, the spatial hash will return many false positives. Too many cells will be hard on the cache and waste memory. the Setting count to ~10x the number of objects in the space is probably a good starting point. Tune from there if necessary.
+     */
     useSpatialHash: function(dim, count){
       var staticShapes = new SpaceHash(dim, count, Shape.prototype.getBB, undefined );
       var activeShapes = new SpaceHash(dim, count, Shape.prototype.getBB, staticShapes );
@@ -358,84 +484,166 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       this.activeShapes = activeShapes;
     },
     
+    /**
+     * Get the default static body for this space
+     * @function getStaticBody
+     */
     getStaticBody: function(){
       return this.staticBody;
     },
+    /**
+     * @function getCurrentTimeStep
+     */
     getCurrentTimeStep: function(){
       return this.curr_dt;
     },
-    
+    /**
+     * @function setIterations
+     * @param {number} i
+     */
     setIterations: function(i){
       this.iterations = i;
     },
+    /**
+     * @function getIterations
+     */
     getIterations: function(){
       return this.iterations;
     },
+    /**
+     * @function setGravity
+     * @param {cp.Vect} gravity
+     */
     setGravity: function(i){
       this.gravity = i;
     },
+    /**
+     * @function getGravity
+     */
     getGravity: function(){
       return this.gravity;
     },
+    /**
+     * @function setDamping
+     * @param d
+     */
     setDamping: function(d){
       this.damping = d;
     },
+    /**
+     * @function getDamping
+     */
     getDamping: function(){
       return this.damping;
     },
+    /**
+     * @function setIdleSpeedThreshold
+     * @param s
+     */
     setIdleSpeedThreshold: function(s){
       this.idleSpeedThreshold = s;
     },
+    /**
+     * @function getIdleSpeedThreshold
+     */
     getIdleSpeedThreshold: function(){
       return this.idleSpeedThreshold;
     },
+    /**
+     * @function setSleepTimeThreshold
+     * @param {number} s
+     */
     setSleepTimeThreshold: function(s){
       this.sleepTimeThreshold = s;
     },
+    /**
+     * @function getSleepTimeThreshold
+     */
     getSleepTimeThreshold: function(){
       return this.sleepTimeThreshold;
     },
+    /**
+     * @function setCollisionSlop
+     * @param s
+     */
     setCollisionSlop: function(s){
       this.collisionSlop = s;
     },
+    /**
+     * @function getCollisionSlop
+     */
     getCollisionSlop: function(){
       return this.collisionSlop;
     },
+    /**
+     * @function setCollisionBias
+     * @param b
+     */
     setCollisionBias: function(b){
       this.collisionBias = b;
     },
+    /**
+     * @function getCollisionBias
+     */
     getCollisionBias: function(){
       return this.collisionBias;
     },
+    /**
+     * @function setCollisionPersistence
+     * @param {number} p
+     */
     setCollisionPersistence: function(p){
       this.collisionPersistence = p;
     },
+    /**
+     * @function getCollisionPersistence
+     */
     getCollisionPersistence: function(){
       return this.collisionPersistence;
     },
+    /**
+     * @function setEnableContactGraph
+     * @param {boolean} g
+     */
     setEnableContactGraph: function(g){
       this.enableContactGraph = g;
     },
+    /**
+     * @function getEnableContactGraph
+     * @return {boolean}
+     */
     getEnableContactGraph: function(){
       return this.enableContactGraph;
     },
+    /**
+     * @function setUserData
+     * @param {object} u data to attach to this space
+     */
     setUserData: function(u){
       this.data = u;
     },
+    /**
+     * @function getUserData
+     */
     getUserData: function(){
       return this.data;
     },
     
+    /**
+     * @function step
+     * @param {number} dt the timestep to use for this step
+     */
     step: function(dt){ // TODO: check that method again. Probably lots of errors
       if( dt === 0 ){ 
         return;
       }
-      var space = this;
-      var prev_dt = space.curr_dt;
-      space.curr_dt = dt;
+      this.stamp++;
+      
+      var prev_dt = this.curr_dt;
+      this.curr_dt = dt;
       
       // reset and empty the arbiter list.
-      var arbiters = space.arbiters;
+      var arbiters = this.arbiters;
       for( var i = 0; i < arbiters.length; ++i ){
         var arb = arbiters[i];
         //arb.state = Arbiter.State.normal;
@@ -444,47 +652,47 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
           arb.unthread();
         }
       }
-      space.arbiters = arbiters = [];
+      this.arbiters = arbiters = [];
       
       // Integrate positions
-      var bodies = space.bodies;
+      var bodies = this.bodies;
       for( var i = 0; i < bodies.length; ++i ){
         var body = bodies[i];
         body.position_func(dt);
       }
       // Find colliding pairs.
-      space.lock(); {
-        space.pushFreshContactBuffer();
-        space.activeShapes.each(Shape.prototype.updateFunc, undefined);
-        space.activeShapes.reindexQuery(this.collideShapes, space); // TODO ?
+      this.lock(); {
+        this.pushFreshContactBuffer();
+        this.activeShapes.each(Shape.prototype.updateFunc, undefined);
+        this.activeShapes.reindexQuery(this.collideShapes, this); // TODO ?
       } 
-      space.unlock(false);
+      this.unlock(false);
       
-      if( space.sleepTimeThreshold !== Number.POSITIVE_INFINITY || space.enableContactGraph ){
-        // space.processComponents(dt); // TODO: activate again when this is stable.
+      if( this.sleepTimeThreshold !== Number.POSITIVE_INFINITY || this.enableContactGraph ){
+        //this.processComponents(dt); // TODO: activate again when this is stable.
       }
-      space.cachedArbiters.filter( Space.prototype.arbiterSetFilter, space ); // TODO ?
+      this.cachedArbiters.filter( Space.prototype.arbiterSetFilter, this ); // TODO ?
       
-      var slop = space.collisionSlop;
-      var biasCoef = 1 - Math.pow( space.collisionBias, dt );
+      var slop = this.collisionSlop;
+      var biasCoef = 1 - Math.pow( this.collisionBias, dt );
       
       for( var i = 0; i < arbiters.length; ++i ){ 
         arbiters[i].preStep(dt, slop, biasCoef);
       }
-      var constraints = space.constraints;
+      var constraints = this.constraints;
       for( var i = 0; i  < constraints.length; ++i ){
         var constraint = constraints[i];
         constraint.preStep(dt);
       }
       // Integrate velocities.
-      var damping = Math.pow(space.damping, dt);
-      var gravity = space.gravity;
+      var damping = Math.pow(this.damping, dt);
+      var gravity = this.gravity;
       for( var i = 0; i < bodies.length; ++i ){
         var body = bodies[i];
         body.velocity_func(gravity, damping, dt);
       }
       // Apply cached impulses
-      var dt_coef = (space.stamp? dt/prev_dt : 0);
+      var dt_coef = (prev_dt === 0? 0 : dt/prev_dt);
       for( var i = 0; i < arbiters.length; ++i ){
         arbiters[i].applyCachedImpulse(dt_coef);
       }
@@ -493,7 +701,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
         constraint.applyCachedImpulse(dt_coef);
       }
       // Run the impulse solver
-      for( var i = 0; i < space.iterations; ++i ){
+      for( var i = 0; i < this.iterations; ++i ){
         for( var j = 0; j <   arbiters.length; ++j ){
           arbiters[j].applyImpulse();
         }
@@ -503,14 +711,13 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
         }
       }
       // Run the post-solve callbacks
-      space.lock();
+      this.lock();
       for( var i = 0; i < arbiters.length; ++i ){
         var arb = arbiters[i];
         var handler = arb.handler;
-        handler.postSolve.call(space, handler.data);
+        handler.postSolve.call(this, handler.data);
       }
-      space.unlock();
-      space.stamp++;
+      this.unlock();
     },
     
     
@@ -714,11 +921,10 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
           // Body not in a component yet. Perform a DFS to flood fill mark 
           // the component in the contact graph using this body as the root.
           body.floodFillComponent(body);
-          
           // Check if the component should be put to sleep.
           if( !body.componentActive(this.sleepTimeThreshold) ){
             this.sleepingComponents.push(body);
-            
+          
             // #define CP_BODY_FOREACH_COMPONENT(root, var) 	for(cpBody *var = root; var; var = var->node.next)
             for( var other = body; other; other = other.node.next ){
               this.deactivateBody(other);

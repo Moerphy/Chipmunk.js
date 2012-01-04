@@ -1,3 +1,6 @@
+/** 
+ * @namespace cp
+ */
 define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision'], function(Vect, BB, Contact, util, colfuncs){
   "use strict";
 
@@ -11,9 +14,13 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
   var idCounter = 0;
   var hashCounter;
 
+  /**
+   * Opaque collision shape class. More of an abstract class, don't use directly.
+   * @class Shape
+   */
   var Shape = function(body){
     this.hashid = idCounter;
-    this.hash = this.hashid; //  ~~(Math.random()*100000); //TODO: can i remove this, since it'S covered by hashid?
+    this.hash = this.hashid; 
    
     idCounter = (idCounter + 49157)&0xFFFF;
     this.body = body;
@@ -24,14 +31,18 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     this.collision_type = 0;
     this.group = 0; // CP_NO_GROUP
     this.layers = ~0;// CP_ALL_LAYERS
-    
   };
   
   Shape.resetIdCounter = function(){
     idCounter = 0;
   };
-
+  /** @namespace cp.Shape.prototype */
   Shape.prototype = {
+    /**
+     * The rigid body the shape is attached to. Can only be set when the shape is not added to a space.
+     * @function setBody
+     * @param {cp.Body} body
+     */
     setBody: function(body){
       this.body = body;
     },
@@ -52,78 +63,160 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
       return this.body.v;
     },
 
+    /**
+     * The bounding box of the shape. Only guaranteed to be valid after cpShapeCacheBB() or cpSpaceStep() is called. Moving a body that a shape is connected to does not update it’s bounding box. For shapes used for queries that aren’t attached to bodies, you can also use cpShapeUpdate().
+     * @function getBB
+     * @return {cp.BB}
+     */
     getBB: function(){
       return this.bb;
     },
-    
+    /**
+     * A boolean value if this shape is a sensor or not. Sensors only call collision callbacks, and never generate real collisions
+     * @function setSensor
+     * @param {boolean} s
+     */
     setSensor: function(s){
       this.body.activate();
       this.sensor = s;
     },
+    /**
+     * A boolean value if this shape is a sensor or not. Sensors only call collision callbacks, and never generate real collisions
+     * @function getSensor
+     * @return {boolean}
+     */
     getSensor: function(){
       return this.sensor;
     },
-    
+    /**
+     * Friction coefficient. Chipmunk uses the Coulomb friction model, a value of 0.0 is frictionless. The friction for a collision is found by multiplying the friction of the individual shapes together. Tables of friction coefficients.
+     * @function setFriction
+     * @param {number} f
+     */
     setFriction: function(s){
       this.body.activate();
       this.u = s;
     },
+    /**
+     * Friction coefficient. Chipmunk uses the Coulomb friction model, a value of 0.0 is frictionless. The friction for a collision is found by multiplying the friction of the individual shapes together. Tables of friction coefficients.
+     * @function getFriction
+     * @return {number} 
+     */
     getFriction: function(){
       return this.u;
     },
-    
+    /**
+     * The surface velocity of the object. Useful for creating conveyor belts or players that move around. This value is only used when calculating friction, not resolving the collision.
+     * @function setSurfaceVelocity
+     * @param {number} s
+     */
     setSurfaceVelocity: function(s){
       this.body.activate();
       this.surface_v = s;
     },
+    /**
+     * The surface velocity of the object. Useful for creating conveyor belts or players that move around. This value is only used when calculating friction, not resolving the collision.
+     * @function getSurfaceVelocity
+     * @return {number}
+     */
     getSurfaceVelocity: function(){
       return this.surface_v;
     },
     
+    /**
+     * You can assign types to Chipmunk collision shapes that trigger callbacks when objects of certain types touch.
+     * @function setCollisionType
+     * @param {object} c
+     */
     setCollisionType: function(s){
       this.body.activate();
       this.collision_type = s;
     },
+    /**
+     * You can assign types to Chipmunk collision shapes that trigger callbacks when objects of certain types touch.
+     * @function getCollisionType
+     * @return {object}
+     */
     getCollisionType: function(){
       return this.collision_type;
     },
-    
+    /**
+     * Shapes in the same non-zero group do not generate collisions. Useful when creating an object out of many shapes that you don’t want to self collide. Defaults to 0.
+     * @function setGroup
+     * @param {number} g
+     */
     setGroup: function(s){
       this.body.activate();
       this.group = s;
     },
+    /**
+     * Shapes in the same non-zero group do not generate collisions. Useful when creating an object out of many shapes that you don’t want to self collide. Defaults to 0.
+     * @function setGroup
+     * @return {number}
+     */
     getGroup: function(){
       return this.group;
     },
-    
+    /**
+     * Shapes only collide if they are in the same bit-planes. i.e. (a->layers & b->layers) != 0 By default, a shape occupies all bit-planes. Wikipedia has a nice article on bitmasks if you are unfamiliar with how to use them. Defaults to CP_ALL_LAYERS.
+     * @function setLayers
+     * @param {number} l
+     */
     setLayers: function(s){
       this.body.activate();
       this.layers = s;
     },
+    /**
+     * Shapes only collide if they are in the same bit-planes. i.e. (a->layers & b->layers) != 0 By default, a shape occupies all bit-planes. Wikipedia has a nice article on bitmasks if you are unfamiliar with how to use them. Defaults to CP_ALL_LAYERS.
+     * @function getLayers
+     * @return {number}
+     */
     getLayers: function(){
       return this.layers;
     },
-    
+    /**
+     * @function setElasticity
+     * @param {number} e
+     */
     setElasticity: function(s){
       this.e = s;
     },
+    /**
+     * @function getElasticity
+     * @return {number}
+     */
     getElasticity: function(){
       return this.e;
     },
     
+    /**
+     * @function setUserData
+     * @param {object} s
+     */
     setUserData: function(s){
       this.data = s;
     },
+    /**
+     * @function getUserData
+     * @return {object}
+     */
     getUserData: function(){
       return this.data;
     },
     
+    /**
+     * @function pointQuery
+     */
     pointQuery: function(p){
       throw "Not implemented, don't use Shape class directly. Use a subclass (Circle, Segment or Polygon)";
     },
+    /**
+     * @function segmentQuery
+     */
     segmentQuery: function(a,b){
       throw "Not implemented, don't use Shape class directly. Use a subclass (Circle, Segment or Polygon)"
     },
+
     destroy: function(){
       throw "Not implemented, don't use Shape class directly. Destroy is only implemented on POlygons."
     },
@@ -165,7 +258,13 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     
   };
   
+  /** @namespace cp.Shape */
   
+  /**
+   * Fastest and simplest collision shape.
+   * @class Circle
+   * @implements {cp.Shape}
+   */
   Shape.Circle = function(body, radius, offset){
     // call super constructor
     Shape.call(this, body);
@@ -173,15 +272,29 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     this.r = radius;
     this.type = ShapeType.CIRCLE_SHAPE;
   };
-  
+  /**
+   * @function Circle.momentFor
+   * @param {number} mass
+   * @param {number} radius1 inner diameter of circle (0 for solid circle)
+   * @param {number} radius2 outer diameter of circle
+   * @param {cp.Vect} offset
+   */
   Shape.Circle.momentFor = function(m, r1, r2, offset){
     return m*(0.5*(r1*r1 + r2*r2) + offset.lengthsq());
   };
+  /**
+   * Area of a hollow circle
+   * @function Circle.areaFor
+   * @param {number} r1
+   * @param {number} r2
+   */
   Shape.Circle.areaFor = function(r1, r2){
     return Math.PI*Math.abs(r1*r1 - r2*r2);
   };
   
-  
+  /**
+   * @namespace cp.Shape.Circle.prototype
+   */
   Shape.Circle.prototype = util.extend( new Shape(), {
     cacheData: function(p, rot){
       var c = this.tc = p.add( this.c.rotate(rot) );
@@ -189,6 +302,10 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
       return new BB( c.x-r, c.y-r, c.x+r, c.y+r );
     },
     
+    /**
+     * @function pointQuery
+     * @param {cp.Vect} p
+     */
     pointQuery: function(p){
       return this.tc.near(p, this.r);
     },
@@ -221,22 +338,45 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
       return this._circleSegmentQuery(this.tc, this.r, a, b);
     },
     
+    /**
+     * @function getOffset
+     */
     getOffset: function(){
       return this.c;
     },
+    /**
+     * @function @setOffset
+     * @param {cp.Vect} o
+     */
     setOffset: function(c){
       this.c = c;
     },
-    
+    /**
+     * @function getRadius
+     * @return {number}
+     */
     getRadius: function(){
       return this.r;
     },
+    /**
+     * @function setRadius
+     * @param {number} r
+     */
     setRadius: function(r){
       this.r = r;
     }
     
   });
 
+  /**
+   * Meant mainly as a static shape. They can be attached to moving bodies, but they don’t currently generate collisions with other line segments. Can be beveled in order to give them a thickness.
+   * @namespace cp.Shape
+   * @class Segment
+   * @param {cp.Body} body
+   * @param {cp.Vect} a point a of line segment
+   * @param {cp.Vect} b point b of line segment
+   * @param {number} r Thickness of line
+   */
   Shape.Segment = function(body, a, b, r){
     // call super constructor
     Shape.call(this, body);
@@ -246,7 +386,7 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     this.r = r;
     this.type = ShapeType.SEGMENT_SHAPE;
   };
-  
+  /** @namespace cp.Shape.Segment.prototype */
   Shape.Segment.prototype = util.extend( new Shape(), {
     cacheData: function(p, rot){
       this.ta = p.add( this.a.rotate(rot) );
@@ -359,26 +499,47 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
         }
       }
     },
-    
+    /**
+     * @function setEndpoints
+     * @param {cp.Vect} a
+     * @param {cp.Vect} b
+     */
     setEndpoints: function(a, b){
       this.a = a;
       this.b = b;
       this.n = b.sub(a).normalize().perp();
     },
-    
+    /**
+     * @function setRadius
+     * @param {number} radius
+     */
     setRadius: function(radius){
       this.r = radius;
     },
+    /**
+     * @function getRadius
+     * @return {number}
+     */
     getRadius: function(){
       return this.r;
     },
-    
+    /**
+     * @function getNormal
+     */
     getNormal: function(){
       return this.n;
     },
+    /**
+     * @function getB
+     * @return {cp.Vect}
+     */
     getB: function(){
       return this.b;
     },
+    /**
+     * @function getA
+     * @return {cp.Vect}
+     */
     getA: function(){
       return this.a;
     },
@@ -391,6 +552,14 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     
   });
   
+  /**
+   * @namespace cp.Shape.Segment
+   * @function momentFor
+   * @param {number} mass
+   * @param {cp.Vect} a
+   * @param {cp.Vect} b
+   * @return {number} moment of this shape
+   */
   Shape.Segment.momentFor = function(mass, a, b){
     var length = b.sub(a).length();
     var offset = a.add(b).mult( 0.5 );
@@ -400,9 +569,11 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
   
   
   /**
-   * @param body {object} a cpBody object
-   * @param verts {array} array of cpVect objects (determines the length, drops the numVerts param)
-   * @param offset {object} cpVect object
+   * @namespace cp.Shape
+   * @class Polygon
+   * @param {cp.Body} body a cpBody object
+   * @param {array} verts array of cpVect objects (determines the length, drops the numVerts param)
+   * @param {cp.Vect} cpVect offset
    */
   Shape.Polygon = function(body, verts, offset){
     if( !this.validate(verts) ){
@@ -412,6 +583,9 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     Shape.call(this, body);
     this.type = ShapeType.POLY_SHAPE;
   };
+  /**
+   * @namespace cp.Shape.Polygon.prototype
+   */
   Shape.Polygon.prototype = util.extend(new Shape(), {
     transformVerts: function(p, rot){
       var src = this.verts;
@@ -499,11 +673,18 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
       }
       return true;
     },
-    
+    /**
+     * Get number of verts of this polygon
+     * @function getNumVerts
+     * @return {number}
+     */
     getNumVerts: function(){
       return this.numVerts;
     },
-    
+    /**
+     * @function getVert
+     * @param {number} index
+     */
     getVert: function(idx){
       if( idx < 0 || idx >= this.getNumVerts() ){
         throw "Index out of range.";
@@ -574,7 +755,14 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     
   });
 
-
+  /**
+   * Because boxes are so common in physics games, Chipmunk provides shortcuts to create box shaped polygons. The boxes will always be centered at the center of gravity of the body you are attaching them to.
+   * @namespace cp.Shape
+   * @class Box
+   * @param {cp.Body} body the body to attach this to
+   * @param {number|cp.BB} widthOrBox either the width of the box or a cp.BB box
+   * @param {number} [height=widthOrBox.height] height of the box. optional if second parameter was a bounding box.
+   */
   Shape.Box = function(body, widthOrBox, height){
     var box;
     if( arguments.length === 3 ){ // constructor: body, width, height
@@ -592,14 +780,16 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     ];
     return new Shape.Polygon(body, verts, Vect.zero);
   };
-  
+  /**
+   * @namespace cp.Shape.Box
+   * @function momentFor
+   * @param {number} m
+   * @param {number} width
+   * @param {height} height
+   */
   Shape.Box.momentFor = function(m, width, height){
     return m*(width*width + height*height)/12;
   };
   
   return Shape;
 });
-
-
-
-

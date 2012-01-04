@@ -1,3 +1,6 @@
+/**
+ * @namespace cp
+ */
 define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], function(Vect, cpf, util, arrays, assert){
   "use strict";
   // StaticBodySingleton
@@ -9,10 +12,13 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     this.next = next;
     this.idleTime = idleTime;
   };
-  
-  
-  
-  /// Chipmunk's rigid body struct.
+
+  /**
+   * Chipmunk's rigid body struct.
+   * @class Body
+   * @param {number} mass
+   * @param {number} moment
+   */
   var Body = function(mass, moment){   
     /// Function that is called to integrate the body's velocity. (Defaults to cpBodyUpdateVelocity)
     this.velocity_func = this.updateVelocity;
@@ -55,31 +61,39 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     this.arbiterList = undefined;
   };
   
+  /**
+   * @namespace cp.Body.prototype
+   */
   Body.prototype = {
     
     /**
-     *  Returns true if the body is sleeping.
-     * (true is node.root is set)
+     * Returns true if the body is sleeping.
+     * @function isSleeping
      */
     isSleeping: function(){
       return !!this.node.root;
     },
     
     /**
-     * Returns true if the body is static.
-     * (false if node.idleTime is infinite)
+     * Returns true if the body is static (not supposed to be moving).
+     * @function isStatic
      */
     isStatic: function(){
       return this.node.idleTime === Number.POSITIVE_INFINITY;
     },
     
+    /**
+     * Returns true if the body is rogue (not added to the space -> not affected by gravity).
+     * @function isRogue
+     */
     isRogue: function(){
       return !this.space; // not added to space == rogue
     },
     
     /**
      * Convert body relative/local coordinates to absolute/world coordinates.
-     * @param {object}
+     * @function local2World
+     * @param {cp/Vect}
      */
     local2World: function(v){
       return this.p.add( v.rotate(this.rot) );
@@ -87,29 +101,46 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     
     /**
      * Convert body absolute/world coordinates to  relative/local coordinates.
+     * @function world2Local
+     * @param {cp/Vect} v
      */
     world2Local: function(v){
       return v.sub(this.p).unrotate(this.rot);
     },
     
+    /**
+     * @function kineticEnergy
+     * @return {number}
+     */
     kineticEnergy: function(){
       var vsq = this.v.dot(this.v);
       var wsq = this.w * this.w;
       return (vsq ? vsq*this.m : 0) + (wsq ? wsq*this.i : 0);
     },
     
+    /**
+     * @function setMass
+     * @param {number} mass
+     */
     setMass: function(mass){
       this.activate();
       this.m = mass;
       this.m_inv = 1/mass;
     },
-    
+    /**
+     * @function setMoment
+     * @param {number} moment
+     */
     setMoment: function(moment){
       this.activate();
       this.i = moment;
       this.i_inv = 1/moment;
     },
-    
+    /**
+     * Adds a shape to this body.
+     * @function addShape
+     * @param {cp/Shape} shape
+     */
     addShape: function(shape){
       var next = this.shapeList;
       if( next ){
@@ -118,7 +149,11 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
       shape.next = next;
       this.shapeList = shape;
     },
-    
+    /**
+     * Removes a shape from the body
+     * @function removeShape
+     * @param {cp/Shape} shape
+     */
     removeShape: function(shape){
       var prev = shape.prev;
       var next = shape.next;
@@ -148,21 +183,34 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
       return node;
     },
     
+    /**
+     * @function removeConstraint
+     * @param {cp/constraints/Constraint} constraint
+     */
     removeConstraint: function(constraint){
       this.constraintList = this.filterConstraints( this.constraintList, constraint );
     },
     
+    /**
+     * @function setPos
+     * @param {cp/Vect} pos
+     */
     setPos: function(pos){
       this.activate();
       this.p = pos;
     },
     
+    /**
+     * Set the angle of this body in radians.
+     * @function setAngle
+     * @param {number} angle
+     */
     setAngle: function(angle){
       this.activate();
       this.a = angle;
       this.rot = Vect.forangle(angle);
     },
-    
+  
     updateVelocity: function(gravity, damping, dt){
       this.v = this.v.mult(damping).add(gravity.add(this.f.mult(this.m_inv)).mult(dt)).clamp(this.v_limit);
 
@@ -178,16 +226,31 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
       this.w_bias = 0;
     },
     
+    /**
+     * Zero both the forces and torques currently applied to the body.
+     * @function resetForces
+     */
     resetForces: function(){
       this.f = Vect.zero;
       this.t = 0;
     },
     
+    /**
+     * Add the force to body at a relative offset r from the center of gravity.
+     * @function applyForce
+     * @param {cp.Vect} force force to apply to the body
+     * @param {cp.Vect} r offset of the impulse
+     */
     applyForce: function(force, r){
       this.f = this.f.add(force);
       this.t += r.cross(force);
     },
-    
+    /**
+     *  Add the impulse j to body at a relative offset r from the center of gravity.
+     * @function applyImpulse
+     * @param {cp.Vect} j impulse on the body
+     * @param {cp.Vect} r offset of the impulse
+     */
     applyImpulse: function( j, r ){
       this.activate();
       this.v = this.v.add( j.mult(this.m_inv) );
@@ -195,6 +258,12 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
       //util.apply_impulse(this, j, r); 
     },
     
+    /**
+     * Iterate over all shapes of this body.
+     * @function eachShape
+     * @param {function} func a callback function. The callback should look like this: function(shape, data){}, "this" will refer to the body.
+     * @param {object} data data to pass to the callbacks
+     */
     eachShape: function( func, data ){
       var shape = this.shapeList;
       while(shape){
@@ -203,7 +272,12 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
         shape = next;
       }
     },
-    
+    /**
+     * Iterate over all constraints of this body.
+     * @function eachConstraint
+     * @param {function} func a callback function. The callback should look like this: function(constraint, data){}, "this" will refer to the body.
+     * @param {object} data data to pass to the callbacks
+     */
     eachConstraint: function( func, data ){
       var constraint = this.constraintList;
       while( constraint ){
@@ -212,7 +286,12 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
         constraint = next;
       }
     },
-    
+    /**
+     * Iterate over all shapes of this body.
+     * @function eachArbiter
+     * @param {function} func a callback function. The callback should look like this: function(arbiter, data){}, "this" will refer to the body.
+     * @param {object} data data to pass to the callbacks
+     */
     eachArbiter: function(func, data ){
       var arb = this.arbiterList;
       
@@ -223,7 +302,7 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
         arb = next;
       }
     },
-    
+
     activate: function(){
       if( !this.isRogue() ){
         
@@ -281,82 +360,137 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     
     },
     
+    /**
+     * @function getMass
+     */
     getMass: function(){
       return this.m;
     },
     
+    /**
+     * @function getMoment
+     */
     getMoment: function(){
       return this.i;
     },
-    
+    /**
+     * @function getPos
+     */
     getPos: function(){
       return this.p;
     },
-    
+    /**
+     * @function getRot
+     */
     getRot: function(){
       return this.rot;
     },
-    
+    /**
+     * @function getAngle
+     */
     getAngle: function(){
       return this.a;
     },
-    
+    /**
+     * Returns the angular velocity of this body.
+     * @function getAngVel
+     */
     getAngVel: function(){
       return this.w;
     },
+    /**
+     * @function setAngVel
+     * @param w
+     */
     setAngVel: function(w){
       this.activate();
       this.w = w;
     },
-    
+    /**
+     * @function getTorque
+     */
     getTorque: function(){
       return this.t;
     },
+    /**
+     * @function setTorque
+     * @param t
+     */
     setTorque: function(t){
       this.activate();
       this.t = t;
     },
-    
+    /**
+     * @function getVelLimit
+     */
     getVelLimit: function(){
       return this.v_limit
     },
+    /**
+     * @function setVelLimit
+     * @param w
+     */
     setVelLimit: function(w){
       this.activate();
       this.v_limit = w;
     },
-
+    /**
+     * @function getAngVelLimit
+     */
     getAngVelLimit: function(){
       return this.w_limit;
     },
+    /**
+     * @function setAngVelLimit
+     * @param w
+     */
     setAngVelLimit: function(w){
       this.activate();
       this.w_limit = w;
     },
-    
+    /**
+     * @function getUserData
+     * @return {object}
+     */
     getUserData: function(){
       return this.data;
     },
+    /**
+     * @function setUserData
+     * @param {object} data
+     */
     setUserData: function(w){
       this.activate();
       this.data = w;
     },
-
+    /**
+     * @function getVel
+     */
     getVel: function(){
       return this.v;
     },
+    /**
+     * @function setVel
+     * @param v
+     */
     setVel: function(w){
       this.activate();
       this.v = w;
     },
-    
+    /**
+     * @function getForce
+     */
     getForce: function(){
       return this.f;
     },
+    /**
+     * @function setForce
+     * @param f
+     */
     setForce: function(w){
       this.activate();
       this.f = w;
     },
-    
     
     componentRoot: function(){
       return this.node.root;
@@ -373,6 +507,8 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
         
         while(body){
           var next = body.node.next;
+          
+          body.node.idleTime = 0;
           body.node.root = undefined;
           body.node.next = undefined;
           space.activateBody(body);
@@ -437,7 +573,11 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     }
 	
   };
-  
+  /**  @namespace cp */
+  /**
+   * A static body (body that is not supposed to move in the space).
+   * @class Body.Static
+   */
   Body.Static = function(){
     var staticBody = new Body(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
     staticBody.node.idleTime = Number.POSITIVE_INFINITY;
