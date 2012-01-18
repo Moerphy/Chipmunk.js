@@ -23,14 +23,14 @@ define(['cp/Vect', /*'chipmunk/private'*/], function(Vect, cpPrivate){
     },	
 
     /**
-     * Returns true if @c other lies completely within @c bb.
+     * Returns true if other lies completely within bb.
      */
     containsBB: function( other ){
       return (this.l <= other.l && this.r >= other.r && this.b <= other.b && this.t >= other.t);
     },
     
     /**
-     * Returns true if @c bb contains @c v.
+     * Returns true if bb contains v.
      */
     containsVect: function(v){
       return (this.l <= v.x && this.r >= v.x && this.b <= v.y && this.t >= v.y);
@@ -49,7 +49,7 @@ define(['cp/Vect', /*'chipmunk/private'*/], function(Vect, cpPrivate){
     },
     
     /**
-     * Returns a bounding box that holds both @c bb and @c v.
+     * Returns a bounding box that holds both c bb and c v.
      */
     expand: function( v ){
       return new BB(
@@ -65,28 +65,45 @@ define(['cp/Vect', /*'chipmunk/private'*/], function(Vect, cpPrivate){
     },
     
     /**
-     * Merges @c a and @c b and returns the area of the merged bounding box.
+     * Merges  a and  b and returns the area of the merged bounding box.
      */
     mergedArea: function(b){
       return (Math.max(this.r, b.r) - Math.min(this.l, b.l))*(Math.max(this.t, b.t) - Math.min(this.b, b.b));
     },
     
     /**
-     * Return true if the bounding box intersects the line segment with ends @c a and @c b.
+     * @function segmentQuery
+     */
+    segmentQuery: function(a, b){
+      var idx = 1 / (b.x - a.x);
+      var tx1 = (this.l === a.x ? -Number.POSITIVE_INFINITY : (this.l - a.x)*idx);
+      var tx2 = (this.r === a.x ?  Number.POSITIVE_INFINITY : (this.r - a.x)*idx);
+      var txmin = Math.min(tx1, tx2);
+      var txmax = Math.max(tx1, tx2);
+      
+      var idy = 1/(b.y - a.y);
+      var ty1 = (this.b === a.y ? -Number.POSITIVE_INFINITY : (this.b - a.y)*idy);
+      var ty2 = (this.t === a.y ?  Number.POSITIVE_INFINITY : (this.t - a.y)*idy);
+      var tymin = Math.min(ty1, ty2);
+      var tymax = Math.max(ty1, ty2);
+      
+      if( tymin <= txmax && txmin <= tymax ){
+        var min = Math.max(txmin, tymin);
+        var max = Math.min(txmax, tymax);
+        
+        if( 0 <= max && min <= 1.0 ){
+          return Math.max(min, 0);
+        }
+      }
+      return Number.POSITIVE_INFINITY;
+    },
+    /**
+     * @function intersectsSegment
      */
     intersectsSegment: function(a, b){
-      var seg_bb = new BB(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.max(a.x, b.x), Math.max(a.y, b.y));
-      if(this.intersects(seg_bb)){
-        var axis = new Vect(b.y - a.y, a.x - b.x);
-        var offset = new Vect( (a.x + b.x - this.r - this.l), (a.y + b.y - this.t - this.b) );
-        var extents = new Vect(this.r - this.l, this.t - this.b);
-        
-        return (Math.abs(axis.dot(offset)) < Math.abs(axis.x*extents.x) + Math.abs(axis.y*extents.y));
-      }
-      
-      return false;
+      return this.segmentQuery(a, b) !== Number.POSITIVE_INFINITY;
     },
-    
+
     /**
      * Clamp a vector to a bounding box.
      */
@@ -107,7 +124,14 @@ define(['cp/Vect', /*'chipmunk/private'*/], function(Vect, cpPrivate){
       
       return new Vect(x + this.l, y + this.b);
     }
-    
+  };
+  /**
+   * Constructs a cpBB for a circle with the given position and radius.
+   * @param {cp.Vect} p
+   * @param {number} r
+   */
+  BB.forCircle = function(p, r){
+    return new BB(p.x - r, p.y - r, p.x + r, p.y + r);
   };
   
   return BB;

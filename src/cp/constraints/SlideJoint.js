@@ -36,12 +36,13 @@ define(['cp/constraints/Constraint', 'cp/constraints/util', 'cp/cpf'], function(
       var pdist = 0;
       if( dist > this.max ){
         pdist = dist - this.max;
+        this.n = delta.normalize_safe();
       }else if( dist < this.min ){
         pdist = this.min - dist;
-        dist = -dist;
+      }else{
+        this.n = Vect.zero;
+        this.jnAcc = 0;
       }
-      
-      this.n = delta.mult( 1/(dist?dist:Number.POSITIVE_INFINITY) );
       
       // calculate mass normal
       this.nMass = 1 / util.k_scalar( a, b, this.r1, this.r2, this.n );
@@ -52,11 +53,6 @@ define(['cp/constraints/Constraint', 'cp/constraints/util', 'cp/cpf'], function(
       
       // compute max impulse
       this.jnMax = this.maxForce * dt;
-      
-      // if bias is 0, then the joint is not at a limit. Reset cached impulse.
-      if( !this.bias ){
-        this.jnAcc = 0;
-      }
     },
     
     /**
@@ -70,8 +66,8 @@ define(['cp/constraints/Constraint', 'cp/constraints/util', 'cp/cpf'], function(
       util.apply_impulses(a, b, this.r1, this.r2, j);
     },
     
-    applyImpulse: function(){    
-      if( !this.bias ){
+    applyImpulse: function(){  
+      if(this.n.eql(cpvzero)){
         return; // early exit
       }
       

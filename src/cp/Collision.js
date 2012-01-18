@@ -1,4 +1,4 @@
-define(['cp/Contact', 'cp/Hash'], function(Contact, hash_pair){
+define(['cp/Contact', 'cp/Hash', 'cp/Vect', 'cp/cpf'], function(Contact, hash_pair, Vect, cpf){
   // Add contact points for circle to circle collisions.
   // Used by several collision tests.
   var circle2circleQuery = function(p1, p2, r1, r2, con){ 
@@ -24,38 +24,25 @@ define(['cp/Contact', 'cp/Hash'], function(Contact, hash_pair){
 
   // Collide circles to segment shapes.
   var circle2segment = function( circ, seg, con ){
-    // Radius sum
-    var rsum = circ.r + seg.r;
-    // Calculate normal distance from segment.
-    var dn = seg.tn.dot(circ.tc) - seg.ta.dot(seg.tn);
-    var dist = Math.abs(dn) - rsum;
-    if( dist > 0 ){
+    var seg_a = seg.ta;
+    var seg_b = seg.tb;
+    var center = circ.tc;
+    
+    var seg_delta = seg_b.sub(seg_a);
+    var closest_t = cpf.clamp01( seg_delta.dot(center.sub(seg_a))/ seg_delta.lengthsq() );
+    var closest = seg_a.add( seg_delta.mult(closest_t) );
+    if( circle2circleQuery(center, closest, circ.r, seg.r, con) ){
+      var n = con[0].n;
+      // Reject endcap collisions if tangents are provided.
+      if( (closest_t == 0 && n.dot(seg.a_tangent) < 0) ||
+          (closest_t == 1 && n.dot(seg.b_tangent) < 0) ){
+        return 0;
+      }
+		
+      return 1;
+    }else{
       return 0;
     }
-    var dt = -seg.tn.cross(circ.tc);
-    var dtMin = -seg.tn.cross(seg.ta);
-    var dtMax = -seg.tn.cross(seg.tb);
-    // Decision tree to decide which feature of the segment to collide with.
-    if( dt < dtMin ){
-      if( dt < (dtMin - rsum) ){
-        return 0;
-      }else{
-        return circle2circleQuery(circ.tc, seg.ta, circ.r, seg.r, con);
-      }
-    }else{
-      if( dt < dtMax ){
-        var n = (dn < 0) ? seg.tn : seg.tn.neg();
-        con.push( new Contact( circ.tc.add( n.mult(circ.r + dist*0.5) ), n, dist, 0 ) ); // TODO: keep an eye on this, i really fucked that port up.
-        return 1;
-      }else{
-        if( dt < (dtMax + rsum) ){
-          return circle2circleQuery( circ.tc, seg.tb, circ.r, seg.r, con );
-        }else{
-          return 0;
-        }
-      }
-    }
-    return 1;
   };
 
   // This one is complicated and gross. Just don't go there...

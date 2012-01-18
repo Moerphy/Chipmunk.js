@@ -15,7 +15,7 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
   var hashCounter;
 
   /**
-   * Opaque collision shape class. More of an abstract class, don't use directly.
+   * Opaque collision shape class. Used as baseclass for Circle-, Segment- and PolyShapes
    * @class Shape
    */
   var Shape = function(body){
@@ -31,6 +31,11 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     this.collision_type = 0;
     this.group = 0; // CP_NO_GROUP
     this.layers = ~0;// CP_ALL_LAYERS
+    
+    this.next = undefined;
+    this.prev = undefined;
+    this.data = undefined;
+    this.space = undefined;
   };
   
   Shape.resetIdCounter = function(){
@@ -61,6 +66,10 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     // function to get the estimated velocity of a shape for the cpBBTree.
     velocityFunc: function(){
       return this.body.v;
+    },
+    
+    active: function(){
+      return this.prev || (this.body && this.body.shapeList === this);
     },
 
     /**
@@ -204,6 +213,10 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
       return this.data;
     },
     
+    getSpace: function(){
+      return this.space;
+    },
+    
     /**
      * @function pointQuery
      */
@@ -298,8 +311,7 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
   Shape.Circle.prototype = util.extend( new Shape(), {
     cacheData: function(p, rot){
       var c = this.tc = p.add( this.c.rotate(rot) );
-      var r = this.r;
-      return new BB( c.x-r, c.y-r, c.x+r, c.y+r );
+      return new BB.forCircle( c, this.r );
     },
     
     /**
@@ -385,6 +397,9 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     this.n = b.sub(a).normalize().perp();
     this.r = r;
     this.type = ShapeType.SEGMENT_SHAPE;
+    
+    this.a_tangent = Vect.zero;
+    this.b_tangent = Vect.zero;
   };
   /** @namespace cp.Shape.Segment.prototype */
   Shape.Segment.prototype = util.extend( new Shape(), {
@@ -455,31 +470,30 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     
     segmentQuery: function(a, b){
       var n = this.tn;
-      // flip n if a is behind the axis
-      if( this.a.dot(n) < this.ta.dot(n) ){
-        n = n.neg();
-      }
-      var an = a.dot(n);
-      var bn = b.dot(n);
+      var d = this.ta.sub(a).dot(n);
+      var r = this.r;
       
-      if( an != bn ){
-        var d = this.ta.dot(n) + this.r;
-        var t = (d-an)/(bn-an);
-        if( 0 < t && t < 1 ){
-          var point = a.lerp(b, t);
-          var dt = -this.tn.cross(point);
-          var dtMin = -this.tn.cross( this.ta );
-          var dtMax = -this.tn.cross( this.tb );
-          if( dtMin < dt && dt < dtMax ){
-            return { // return QueryInfo
-              shape: this,
-              t: t,
-              n: n
-            }; // don't continue on and check endcaps
-          }
+      var flipped_n = (d > 0? n.neg() : n );
+      var seg_offset = flipped_n.mult(r).sub(a);
+
+      // Make the endpoints relative to 'a' and move them by the thickness of the segment.
+      var seg_a = this.ta.add(seg_offset);
+      var seg_b = this.tb.add(seg_offset);
+      var delta = b.sub(a);
+      
+      if( delta.cross(seg_a) * delta.cross(seg_b) <= 0 ){
+        var d_offset = d + (d > 0? -r : r);
+        var ad = -d_offset;
+        var bd = delta.dot(n) - d_offset;
+        
+        if( ad * bd < 0 ){
+          return {
+            shape: this,
+            t: ad/(ad-bd),
+            n: flipped_n
+          };
         }
-      }
-      if( this.r ){
+      }else  if( r !== 0 ){
         var info1 = {
           shape: undefined,
           t: 1,
@@ -548,10 +562,14 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
       var a = n.dot(this.ta) - this.r;
       var b = n.dot(this.tb) - this.r;
       return Math.min(a,b) - d;
-    }
+    },
     
+    setNeighbors: function(prev, next){
+      this.a_tangent = prev.sub(this.a);
+      this.b_tangent = next.sub(this.b);
+    }
   });
-  
+
   /**
    * @namespace cp.Shape.Segment
    * @function momentFor
@@ -575,7 +593,7 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
    * @param {array} verts array of cpVect objects (determines the length, drops the numVerts param)
    * @param {cp.Vect} cpVect offset
    */
-  Shape.Polygon = function(body, verts, offset){
+  Shape.Poly = function(body, verts, offset){
     if( !this.validate(verts) ){
       throw "Polygon is concave or has a reversed winding.";
     }
@@ -584,9 +602,9 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     this.type = ShapeType.POLY_SHAPE;
   };
   /**
-   * @namespace cp.Shape.Polygon.prototype
+   * @namespace cp.Shape.Poly.prototype
    */
-  Shape.Polygon.prototype = util.extend(new Shape(), {
+  Shape.Poly.prototype = util.extend(new Shape(), {
     transformVerts: function(p, rot){
       var src = this.verts;
       var dst = this.tVerts;
@@ -754,6 +772,67 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     }
     
   });
+  
+  /**
+   * @namespace cp.Shape.Poly
+   * @function momentFor
+   * @param {number} mass
+   * @param {array} verts array of cp.Vect objects
+   * @param {cp.Vect} offset
+   */
+  Shape.Poly.momentFor = function(m, verts, offset){
+    var sum1 = 0;
+    var sum2 = 0;
+    
+    for( var i = 0, l = verts.length; i < l; ++i ){
+      var v1 = verts[i].add(offset);
+      var v2 = verts[(i+1)%l].add(offset);
+      
+      var a = v2.cross(v1);
+      var b = v1.dot(v1) + v1.dot(v2) + v2.dot(v2);
+      
+      sum1 += a*b;
+      sum2 += a;
+    }
+    return (m*sum1) / (6*sum2);
+  };
+  
+  /**
+   * @namespace cp.Shape.Poly
+   * @function areaFor
+   * @param {array} verts array of cp.Vect objects
+   */
+  Shape.Poly.areaFor = function(verts){
+    var area = 0;
+    
+    for( var i = 0, l = verts.lengt; i < l; ++i ){
+      area += verts[i].cross( verts[(i+1)%l] );
+    }
+    
+    return - area / 2;
+  };
+
+  /**
+   * @namespace cp.Shape.Poly
+   * @function centroidFor
+   * @param {array} verts array of cp.Vect objects
+   */
+  Shape.Poly.centroidFor = function(verts){
+    var sum = 0;
+    var vsum = Vect.zero;
+    
+    for( var i = 0, l = verts.lengt; i < l; ++i ){
+      var v1 = verts[i];
+      var v2 = verts[(i+1)%l];
+      var cross = v1.cross(v2);
+      
+      sum += cross;
+      vsum = vsum.add( v1.add(v2).mult(cross) );
+    }
+    
+    return vsum.mult( 1 / (3*sum) );
+  };
+
 
   /**
    * Because boxes are so common in physics games, Chipmunk provides shortcuts to create box shaped polygons. The boxes will always be centered at the center of gravity of the body you are attaching them to.
@@ -778,7 +857,7 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
       new Vect(box.r, box.t),
       new Vect(box.r, box.b)
     ];
-    return new Shape.Polygon(body, verts, Vect.zero);
+    return new Shape.Poly(body, verts, Vect.zero);
   };
   /**
    * @namespace cp.Shape.Box
@@ -790,6 +869,11 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
   Shape.Box.momentFor = function(m, width, height){
     return m*(width*width + height*height)/12;
   };
+  
+  define( 'cp/shape/Circle', function(){ return Shape.Circle; } );
+  define( 'cp/shape/Segment', function(){ return Shape.Segment; } );
+  define( 'cp/shape/Poly', function(){ return Shape.Poly; } );
+  define( 'cp/shape/Box', function(){ return Shape.Box; } );
   
   return Shape;
 });

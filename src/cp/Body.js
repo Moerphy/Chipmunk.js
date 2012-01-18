@@ -25,9 +25,6 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     /// Function that is called to integrate the body's position. (Defaults to cpBodyUpdatePosition)
     this.position_func = this.updatePosition;
     
-    var node = new ComponentNode(undefined, undefined, 0);
-    this.node = node;
-    
     /// Position of the rigid body's center of gravity.
     this.p = Vect.zero;
     /// Velocity of the rigid body's center of gravity.
@@ -36,7 +33,7 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     this.f = Vect.zero;
     
     /// Angular velocity of the body around it's center of gravity in radians/second.
-    this.w = 0;
+    this._w = 0;
     /// Torque applied to the body around it's center of gravity.
     this.t = 0;
     
@@ -59,6 +56,8 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     this.setAngle(0);
     
     this.arbiterList = undefined;
+    
+    this.node = new ComponentNode(undefined, undefined, 0);
   };
   
   /**
@@ -66,6 +65,13 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
    */
   Body.prototype = {
     
+    set w(val){
+      if( val !== val ) debugger;
+      this._w = val;
+    },
+    get w(){
+      return this._w;
+    },
     /**
      * Returns true if the body is sleeping.
      * @function isSleeping
@@ -79,7 +85,9 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
      * @function isStatic
      */
     isStatic: function(){
-      return this.node.idleTime === Number.POSITIVE_INFINITY;
+      // patched the isStatic method to check for rogue+infinity mass+momentum
+      return this.node.idleTime === Number.POSITIVE_INFINITY || 
+        ( false && this.isRogue() && this.getMass() === Number.POSITIVE_INFINITY && this.getMoment() === Number.POSITIVE_INFINITY );
     },
     
     /**
@@ -210,6 +218,10 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
       this.a = angle;
       this.rot = Vect.forangle(angle);
     },
+    
+    getSpace: function(){
+      return this.space;
+    },
   
     updateVelocity: function(gravity, damping, dt){
       this.v = this.v.mult(damping).add(gravity.add(this.f.mult(this.m_inv)).mult(dt)).clamp(this.v_limit);
@@ -329,6 +341,8 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
       this.sleepWithGroup(undefined);
     },
     sleepWithGroup: function(group){
+      // TODO
+      return;
       assert.hard( !this.isStatic() && !this.isRogue() , "Rogue and static bodies cannot be put to sleep." );
       var space = this.space;
         
@@ -450,7 +464,7 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     },
     /**
      * @function getUserData
-     * @return {object}
+     * @return {object} object that is attached to this body
      */
     getUserData: function(){
       return this.data;
@@ -492,87 +506,26 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
       this.f = w;
     },
     
-    componentRoot: function(){
-      return this.node.root;
+    /**
+     * @function getVelAtPoint
+     * @param {cp.Vect} r
+     */
+    getVelAtPoint: function(r){
+      return body.v.add( r.perp().mult(body.w) );
     },
     
-    componentActivate: function(){
-        if( !this.isSleeping() ){
-          return;
-        }
-        assert.soft( !this.isRogue(), "Internal Error: ComponentActivate() called on a rogue body." );
-        
-        var space = this.space;
-        var body = this;
-        
-        while(body){
-          var next = body.node.next;
-          
-          body.node.idleTime = 0;
-          body.node.root = undefined;
-          body.node.next = undefined;
-          space.activateBody(body);
-          body = next;
-        }
-        arrays.deleteObj(space.sleepingComponents, this);
+    getVelAtWorldPoint: function(point){
+      return this.getVelAtPoint( point.sub(this.p) );
     },
     
-    componentActive: function(threshold){
-      for( var body = this; body; body = body.node.next ){
-        if( body.node.idleTime < threshold ){
-          return true;
-        }
-      }
-      return false;
+    getVelAtLocalPoint: function(point){
+      return this.getVelAtPoint( point.rotate(this.rot) );
     },
     
-    componentAdd: function(/* root, */ body){
-      body.node.root = this;
-
-      if(body !== this){
-        body.node.next = this.node.next;
-        this.node.next = body;
-      }
-    },
     
-    floodFillComponent: function(body){
-      var root = this;
-
-      if( !body.isStatic() && !body.isRogue() ){
-        var other_root = body.componentRoot();
-        if( !other_root ){
-          root.componentAdd(body);
-          
-          //#define CP_BODY_FOREACH_ARBITER(bdy, var)	for(cpArbiter *var = bdy->arbiterList; var; var = cpArbiterNext(var, bdy))
-          //#define CP_BODY_FOREACH_CONSTRAINT(bdy, var) for(cpConstraint *var = bdy->constraintList; var; var = cpConstraintNext(var, bdy))
-          for( var arb = body.arbiterList; arb; arb = arb.next(body) ){
-            root.floodFillComponent( (body === arb.body_a)?arb.body_b:arb.body_a );
-          }
-          for( var constraint = body.constraintList; constraint; constraint = constraint.next(body) ){
-            root.floodFillComponent( (body === constraint.a)?constraint.b:constraint.a );
-          }
-
-        }else{
-          assert.soft(other_root === root, "Internal Error: Inconsistency dectected in the contact graph.");
-        }
-      }
-    },
-    
-    pushArbiter: function(arb){
-      assert.soft( !arb.threadForBody(this).next, "Internal Error: Dangling contact graph pointers detected. (A)" );
-      assert.soft( !arb.threadForBody(this).prev, "Internal Error: Dangling contact graph pointers detected. (B)" );
-      
-      var next = this.arbiterList;
-      assert.soft( !next || !next.threadForBody(this).prev, "Internal Error: Dangling contact graph pointers detected. (C)" );
-      arb.threadForBody(this).next = next;
-      if( next ){
-        next.threadForBody(this).prev = arb;
-      }
-      this.arbiterList = arb;
-
-    }
-	
+    componentRoot: function(){} // TODO
   };
+
   /**  @namespace cp */
   /**
    * A static body (body that is not supposed to move in the space).

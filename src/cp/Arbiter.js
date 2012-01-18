@@ -34,9 +34,7 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
     this.body_b = b.body;
     
     this.counter = ++counter;
-    
-    this.thread_a = {};
-    this.thread_b = {};
+
     
     this.stamp = 0;
     this.state = ArbiterState.firstColl;
@@ -47,30 +45,6 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
   Arbiter.State = ArbiterState;
  
   Arbiter.prototype = {
-    unthreadHelper: function(body){
-      var thread = this.threadForBody(body);
-      var prev = thread.prev;
-      var next = thread.next;
-      
-      if( prev ){
-        prev.threadForBody(body).next = next;
-      }else{
-        body.arbiterList = next;
-      }
-      
-      if( next ){
-        next.threadForBody(body).prev = prev;
-      }
-      thread.prev = undefined;
-      thread.next = undefined;
-    },
-    
-    
-    unthread: function(){
-      this.unthreadHelper(this.body_a);
-      this.unthreadHelper(this.body_b);
-    },
-    
     getNormal: function(i){
       if( 0 <= i && i < this.numContacts ){
         var n = this.contacts[i].n;
@@ -116,7 +90,7 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
         var con = contacts[i];
         sum = sum.add( con.n.mult(con.jnAcc) );
       }
-      return sum;
+      return (this.swappedColl ? sum : sum.neg());
     },
     
     totalImpulseWithFriction: function(){
@@ -126,7 +100,7 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
         var con = contacts[i];
         sum = sum.add( con.n.rotate( new Vect(con.jnAcc, con.jtAcc) ) );
       }
-      return sum;
+      return (this.swappedColl ? sum : sum.neg());
     },
     
     ignore: function(){
@@ -195,8 +169,17 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
       for( var i =0 ; this.contacts && i < this.numContacts; ++i ){
         var con = this.contacts[i];
         if( con ){
+          //*
           var j = con.n.rotate( new Vect(con.jnAcc, con.jtAcc) );
           util.apply_impulses( a, b, con.r1, con.r2, j.mult(dt_coef) );
+          //*/
+          /*
+          var nx = con.n.x;
+          var ny = con.n.y;
+          var jx = nx*con.jnAcc - ny*con.jtAcc;
+          var jy = nx * con.jtAcc + ny * con.jnAcc;
+          apply_impulses(a, b, con.r1, con.r2, new Vect(jx * dt_coef, jy * dt_coef) );
+          //*/
         }
       }
     },
@@ -248,10 +231,6 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
         // Apply the final impulse.
         util.apply_impulses( a, b, r1, r2, n.rotate( new Vect(jn, jt) ) );
       }
-    },
-    
-    threadForBody: function(body){
-      return (this.body_a === body ? this.thread_a : this.thread_b);
     },
     
     getElasticity: function(){
@@ -329,16 +308,21 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
       }
       return true;
     },
-    
-    next: function(body){
-      var arb =  (this.body_a === body? this.thread_a.next : this.thread_b.next);
-      if( this === arb ){
-        arb = undefined;
+
+    totalKE: function(){
+      var eCoef = (1 - this.e) / (1+this.e);
+      var sum = 0;
+      var contacts = this.contacts;
+      
+      for( var i = 0; i < contacts.length; ++i ){
+        var con = contacts[i];
+        var jnAcc = con.jnAcc;
+        var jtAcc = con.jtAcc;
+        sum + eCoef * jnAcc * jnAcc / con.nMass  +  jAcc * jtAcc / con.tMass;
       }
-      return arb;
+      return sum;
     }
   };
  
   return Arbiter;
 });
-

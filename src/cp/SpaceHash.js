@@ -380,8 +380,7 @@ define(['cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Prime'], fun
     contains: function(obj, hashid){
       return this.handleSet.find(hashid, obj) != undefined;
     }
-    
-    
+
   });
 
   return SpaceHash;

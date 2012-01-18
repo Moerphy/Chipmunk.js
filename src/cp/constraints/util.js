@@ -31,13 +31,13 @@ define(['cp/Vect'], function(Vect){
       this.apply_bias_impulse(b, j, r2);
     },
     
+    k_scalar_body: function(body, r, n){
+      var rcn = r.cross(n);
+      return body.m_inv + body.i_inv*rcn*rcn;
+    },
+    
     k_scalar: function( a, b, r1, r2, n ){
-      var massSum = a.m_inv + b.m_inv;
-      var r1cn = r1.cross(n);
-      var r2cn = r2.cross(n);
-      
-      var value = massSum + a.i_inv*r1cn*r1cn + b.i_inv*r2cn*r2cn;
-      
+      var value = this.k_scalar_body( a, r1, n ) + this.k_scalar_body(b, r2, n);
       return value;
     },
     

@@ -35,6 +35,9 @@ define([], function(){
     /// Generally this points to your the game object class so you can access it
     /// when given a cpConstraint reference in a callback.
     this.data = undefined;
+    
+    this.preSolve = undefined;
+    this.postSolve = undefined;
   };
   
   Constraint.prototype = {
@@ -84,6 +87,18 @@ define([], function(){
       this.activateBodies();
       this.data = value;
     },
+    setPreSolveFunc: function(func){
+      this.preSolve = func;
+    },
+    getPreSolveFunc: function(func){
+      return this.preSolve;
+    },
+    setPostSolveFunc: function(func){
+      this.postSolve = func;
+    },
+    getPostSolveFunc: function(func){
+      return this.postSolve;
+    }
   };
   
   return Constraint;
