@@ -6,7 +6,7 @@ It's not a 1:1 port of the API, more of an OOP-Port. For instance <code>cpSpaceA
 
 h2. Status
 
-Currently most of the API is ported. As far as I know off the top of my head the only gaps are in Spatial Indexing (only SpatialHash available so far).
+Currently most of the API is ported.
 
 Since most of the code is similiar to the original C version there still is a lot of potential (and probably need) for optimizing it for Javascript.
 

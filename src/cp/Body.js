@@ -33,7 +33,7 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     this.f = Vect.zero;
     
     /// Angular velocity of the body around it's center of gravity in radians/second.
-    this._w = 0;
+    this.w = 0;
     /// Torque applied to the body around it's center of gravity.
     this.t = 0;
     
@@ -56,6 +56,7 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     this.setAngle(0);
     
     this.arbiterList = undefined;
+    this.constraintList = undefined;
     
     this.node = new ComponentNode(undefined, undefined, 0);
   };
@@ -64,14 +65,7 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
    * @namespace cp.Body.prototype
    */
   Body.prototype = {
-    
-    set w(val){
-      if( val !== val ) debugger;
-      this._w = val;
-    },
-    get w(){
-      return this._w;
-    },
+
     /**
      * Returns true if the body is sleeping.
      * @function isSleeping
@@ -317,7 +311,6 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
 
     activate: function(){
       if( !this.isRogue() ){
-        
         var root = this.componentRoot();
         if( root ){
           root.componentActivate();
@@ -340,9 +333,8 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     sleep: function(){
       this.sleepWithGroup(undefined);
     },
+    
     sleepWithGroup: function(group){
-      // TODO
-      return;
       assert.hard( !this.isStatic() && !this.isRogue() , "Rogue and static bodies cannot be put to sleep." );
       var space = this.space;
         
@@ -522,8 +514,81 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
       return this.getVelAtPoint( point.rotate(this.rot) );
     },
     
+    componentAdd: function( body ){
+      body.node.root = this;
+      
+      if( body !== this ){
+        body.node.next = this.node.next;
+        this.node.next = body;
+      }
+    },
     
-    componentRoot: function(){} // TODO
+    componentActivate: function(){
+      if( !this.isSleeping() ){
+        return;
+      }
+      assert.hard( !this.isRogue(), "Internal Error: ComponentActivate() called on a rogue body." );
+      
+      var space = this.space;
+      var body = this;
+      while( body ){
+        var next = body.node.next;
+        
+        body.node.idleTime = 0;
+        body.node.root = undefined;
+        body.node.next = undefined;
+        space.activateBody(body);
+        body = next;
+      }
+      arrays.deleteObj( space.sleepingComponents, this );
+    },
+    
+    
+    componentActive: function(threshold){
+      for( var body = this; body; body = body.node.next ){
+        if( body.node.idleTime < threshold ){
+          return true;
+        }
+      }
+      return false;
+    },
+
+    componentRoot: function(){
+      return this.node.root;
+    },
+    
+    pushArbiter: function(arb){
+      assert.soft( !arb.threadForBody(this).next, "Internal Error: Dangling contact graph pointers detected. (A)" );
+      assert.soft( !arb.threadForBody(this).prev, "Internal Error: Dangling contact graph pointers detected. (B)" );
+      
+      var next = this.arbiterList;
+      assert.soft( !next || !next.threadForBody(this).prev, "Internal Error: Dangling contact graph pointers detected. (C)" );
+      arb.threadForBody(this).next = next;
+      
+      if( next ){
+        next.threadForBody(this).prev = arb;
+      }
+      this.arbiterList = arb;
+    },
+    
+    floodFillComponent: function(body){
+      // Rogue bodies cannot be put to sleep and prevent bodies they are touching from sleepining anyway.
+      // Static bodies (which are a type of rogue body) are effectively sleeping all the time.
+      if( !body.isRogue() ){
+        var other_root = body && body.componentRoot();
+        if( !other_root ){
+          this.componentAdd(body);
+          for( var arb = body.arbiterList; arb; arb = arb.next(body) ){
+            this.floodFillComponent( (body === arb.body_a) ? arb.body_b : arb.body_a );
+          }
+          for( var constraint = body.constraintList; constraint; constraint = constraint.next(body) ){
+            this.floodFillComponent( (body === constraint.a) ? constraint.b : constraint.a );
+          }
+        }else{
+          assert.soft( other_root === this, "Internal Error: Inconsistency dectected in the contact graph." );
+        }
+      }
+    }
   };
 
   /**  @namespace cp */

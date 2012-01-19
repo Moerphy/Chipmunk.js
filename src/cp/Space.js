@@ -13,9 +13,6 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
   var defaultCollisionHandler = new CollisionHandler(0,0,alwaysCollide, alwaysCollide, nothing, nothing, undefined); 
 
 
-  var activateTouchingHelper = function(point, other){
-    this.body.activate();
-  };
   // callback from the spatial hash
   var shapeQueryHelper = function(b, context){
     if( (a.group && a.group === b.group) ||
@@ -296,7 +293,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
         if( shape && arb.state !== Arbiter.State.cached ){
           arb.callSeparate(context.space);
         }
-        //arb.unthread(); // TODO
+        arb.unthread(); // TODO
         arrays.deleteObj( context.space.arbiters, arb );
         //context.space.pooledArbiters.push(arb);
         return false;
@@ -690,10 +687,10 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       var constraints = this.constraints;
       for( var i = 0; i < arbiters.length; ++i ){
         var arb = arbiters[i];
-        //arb.state = Arbiter.State.normal;
+        //arb.state = Arbiter.State.normal; // TODO: why the fuck do my collision just flip out of control with this in?
         // If both bodies are awake, unthread the arbiter from the contact graph
         if( !arb.body_a.isSleeping() && !arb.body_b.isSleeping() ){
-          //arb.unthread(); // TODO
+          arb.unthread(); // TODO
         }
       }
       this.arbiters = arbiters = [];
@@ -775,11 +772,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       } 
       this.unlock(true);
     },
-    
-    
-    
-  
-    
+
     // callback from the spatial hash.
     collideShapes: function(/* a, */ b, space){ // NOTE: this = a
       var a = this;
@@ -909,6 +902,86 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       this.unlock(true);
       
       return context.anyCollision;
+    },
+    
+    processComponents: function(dt){
+      var sleep = (this.sleepTimeThreshold !== Number.POSITIVE_INFINITY);
+      var bodies = this.bodies;
+      
+      // Calculate the kinetic energy of all the bodies.
+      if( sleep ){
+        var dv = this.idleSpeedThreshold;
+        var dvsq = dv ? dv*dv : this.gravity.lengthsq() * dt * dt;
+        
+        // update idling and reset component nodes
+        for( var i = 0, l = bodies.length; i < l; ++i ){
+          var body = bodies[i];
+          
+          // Need to deal with infinite mass objects
+          var keThreshold = dvsq ? body.m * dvsq : 0;
+          body.node.idleTime = (body.kineticEnergy() > keThreshold) ? 0 : body.node.idleTime + dt;
+        }
+      }
+      // Awaken any sleeping bodies found and then push arbiters to the bodies' lists.
+      var arbiters = this.arbiters;
+      for( var i = 0, count = arbiters.length; i < count; ++i ){
+        var arb = arbiters[i];
+        var a = arb.body_a;
+        var b = arb.body_b;
+        
+        if( sleep ){
+          if( (b.isRogue() && !b.isStatic()) || a.isSleeping() ){
+            a.activate();
+          }
+          if( (a.isRogue() && !a.isStatic()) || b.isSleeping() ){
+            b.activate();
+          }
+        }
+        a.pushArbiter(arb);
+        b.pushArbiter(arb);
+      }
+      
+      if( sleep ){
+        // Bodies should be held active if connected by a joint to a non-static rouge body.
+        var constraints = this.constraints;
+        for( var i = 0, l = constraints.length; i < l; ++i ){
+          var constraint = constraints[i];
+          var a = constraint.a;
+          var b = constraint.b;
+          
+          if( b.isRogue() && !b.isStatic() ){
+            a.activate();
+          }
+          if( a.isRogue() && !a.isStatic() ){
+            b.activate();
+          }
+        }
+        // Generate components and deactivate sleeping ones
+        for( var i = 0, l = bodies.length; i < l; ){
+          var body = bodies[i];
+          
+          if( !body.componentRoot() ){
+            // Body not in a component yet. Perform a DFS to flood fill mark 
+            // the component in the contact graph using this body as the root.
+            body.floodFillComponent(body);
+            
+            // Check if the component should be put to sleep.
+            if( body.componentActive(this.sleepTimeThreshold) ){
+              this.sleepingComponents.push(body);
+              for( var other = body; other; other = other.node.next ){
+                this.deactivateBody( other );
+              }
+              // cpSpaceDeactivateBody() removed the current body from the list.
+              // Skip incrementing the index counter.
+              continue;
+            }
+          }
+          ++i;
+          // Only sleeping bodies retain their component node pointers.
+          body.node.root = undefined;
+          body.node.next = undefined;
+        }
+      }
     }
     
   };

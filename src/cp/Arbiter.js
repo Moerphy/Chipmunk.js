@@ -40,6 +40,9 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
     this.state = ArbiterState.firstColl;
     
     this.contacts = [];
+    
+    this.thread_a = {};
+    this.thread_b = {};
   };
  
   Arbiter.State = ArbiterState;
@@ -321,8 +324,41 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
         sum + eCoef * jnAcc * jnAcc / con.nMass  +  jAcc * jtAcc / con.tMass;
       }
       return sum;
+    },
+    
+    threadForBody: function(body){
+      return (this.body_a === body) ? this.thread_a : this.thread_b;
+    },
+    
+    next: function(body){
+      return (this.body_a === body ? this.thread_a.next : this.thread_b.next);
+    },
+    
+    unthread: function(){
+      unthreadHelper( this, this.body_a );
+      unthreadHelper( this, this.body_a );
     }
   };
+ 
+  var unthreadHelper = function(arb, body){
+    var thread = arb.threadForBody(body);
+    var prev = thread.prev;
+    var next = thread.next;
+    
+    if( prev ){
+      prev.threadForBody(body).next = next;
+    }else{
+      body.arbiterList = next;
+    }
+    
+    if( next ){
+      next.threadForBody(body).prev = prev;
+    }
+    
+    thread.prev = undefined;
+    thread.next = undefined;
+  };
+
  
   return Arbiter;
 });
