@@ -241,7 +241,7 @@ define([], function(){
      * @param {cp/Vect} v2 vector to interpolate to (target)
      * @param t {Number} 
      */
-    cpvslerp: function(v2, t){
+    slerp: function(v2, t){
       var omega = Math.acos(this.dot(v2));
       
       if(omega !== undefined){ // TODO: unnecessary in JS?
@@ -250,6 +250,12 @@ define([], function(){
       } else {
         return this;
       }
+    },
+
+    values: function(x,y){
+      this.x = x;
+      this.y = y;
+      return this;
     },
 
     toString: function(){

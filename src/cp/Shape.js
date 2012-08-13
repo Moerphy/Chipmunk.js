@@ -73,7 +73,9 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     },
 
     /**
-     * The bounding box of the shape. Only guaranteed to be valid after cpShapeCacheBB() or cpSpaceStep() is called. Moving a body that a shape is connected to does not update it’s bounding box. For shapes used for queries that aren’t attached to bodies, you can also use cpShapeUpdate().
+     * The bounding box of the shape. Only guaranteed to be valid after cpShapeCacheBB() or cpSpaceStep() is called. 
+     * Moving a body that a shape is connected to does not update it’s bounding box. 
+     * For shapes used for queries that aren’t attached to bodies, you can also use cpShapeUpdate().
      * @function getBB
      * @return {cp.BB}
      */
@@ -98,7 +100,8 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
       return this.sensor;
     },
     /**
-     * Friction coefficient. Chipmunk uses the Coulomb friction model, a value of 0.0 is frictionless. The friction for a collision is found by multiplying the friction of the individual shapes together. Tables of friction coefficients.
+     * Friction coefficient. Chipmunk uses the Coulomb friction model, a value of 0.0 is frictionless. 
+     * The friction for a collision is found by multiplying the friction of the individual shapes together. Tables of friction coefficients.
      * @function setFriction
      * @param {number} f
      */
@@ -107,7 +110,8 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
       this.u = s;
     },
     /**
-     * Friction coefficient. Chipmunk uses the Coulomb friction model, a value of 0.0 is frictionless. The friction for a collision is found by multiplying the friction of the individual shapes together. Tables of friction coefficients.
+     * Friction coefficient. Chipmunk uses the Coulomb friction model, a value of 0.0 is frictionless. 
+     * The friction for a collision is found by multiplying the friction of the individual shapes together. Tables of friction coefficients.
      * @function getFriction
      * @return {number} 
      */
@@ -115,7 +119,8 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
       return this.u;
     },
     /**
-     * The surface velocity of the object. Useful for creating conveyor belts or players that move around. This value is only used when calculating friction, not resolving the collision.
+     * The surface velocity of the object. Useful for creating conveyor belts or players that move around. 
+     * This value is only used when calculating friction, not resolving the collision.
      * @function setSurfaceVelocity
      * @param {number} s
      */
@@ -124,7 +129,8 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
       this.surface_v = s;
     },
     /**
-     * The surface velocity of the object. Useful for creating conveyor belts or players that move around. This value is only used when calculating friction, not resolving the collision.
+     * The surface velocity of the object. Useful for creating conveyor belts or players that move around.
+     * This value is only used when calculating friction, not resolving the collision.
      * @function getSurfaceVelocity
      * @return {number}
      */
@@ -150,7 +156,8 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
       return this.collision_type;
     },
     /**
-     * Shapes in the same non-zero group do not generate collisions. Useful when creating an object out of many shapes that you don’t want to self collide. Defaults to 0.
+     * Shapes in the same non-zero group do not generate collisions.
+     * Useful when creating an object out of many shapes that you don’t want to self collide. Defaults to 0.
      * @function setGroup
      * @param {number} g
      */
@@ -159,7 +166,8 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
       this.group = s;
     },
     /**
-     * Shapes in the same non-zero group do not generate collisions. Useful when creating an object out of many shapes that you don’t want to self collide. Defaults to 0.
+     * Shapes in the same non-zero group do not generate collisions.
+     * Useful when creating an object out of many shapes that you don’t want to self collide. Defaults to 0.
      * @function setGroup
      * @return {number}
      */
@@ -167,7 +175,9 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
       return this.group;
     },
     /**
-     * Shapes only collide if they are in the same bit-planes. i.e. (a->layers & b->layers) != 0 By default, a shape occupies all bit-planes. Wikipedia has a nice article on bitmasks if you are unfamiliar with how to use them. Defaults to CP_ALL_LAYERS.
+     * Shapes only collide if they are in the same bit-planes. i.e. (a->layers & b->layers) != 0 
+     * By default, a shape occupies all bit-planes. 
+     * Wikipedia has a nice article on bitmasks if you are unfamiliar with how to use them. Defaults to CP_ALL_LAYERS.
      * @function setLayers
      * @param {number} l
      */
@@ -176,7 +186,9 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
       this.layers = s;
     },
     /**
-     * Shapes only collide if they are in the same bit-planes. i.e. (a->layers & b->layers) != 0 By default, a shape occupies all bit-planes. Wikipedia has a nice article on bitmasks if you are unfamiliar with how to use them. Defaults to CP_ALL_LAYERS.
+     * Shapes only collide if they are in the same bit-planes. i.e. (a->layers & b->layers) != 0 
+     * By default, a shape occupies all bit-planes. 
+     * Wikipedia has a nice article on bitmasks if you are unfamiliar with how to use them. Defaults to CP_ALL_LAYERS.
      * @function getLayers
      * @return {number}
      */
@@ -311,7 +323,7 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
   Shape.Circle.prototype = util.extend( new Shape(), {
     cacheData: function(p, rot){
       var c = this.tc = p.add( this.c.rotate(rot) );
-      return new BB.forCircle( c, this.r );
+      return BB.forCircle( c, this.r );
     },
     
     /**
@@ -381,7 +393,9 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
   });
 
   /**
-   * Meant mainly as a static shape. They can be attached to moving bodies, but they don’t currently generate collisions with other line segments. Can be beveled in order to give them a thickness.
+   * Meant mainly as a static shape.
+   * They can be attached to moving bodies, but they don’t currently generate collisions with other line segments.
+   * Can be beveled in order to give them a thickness.
    * @namespace cp.Shape
    * @class Segment
    * @param {cp.Body} body
@@ -579,10 +593,8 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
    * @return {number} moment of this shape
    */
   Shape.Segment.momentFor = function(mass, a, b){
-    var length = b.sub(a).length();
-    var offset = a.add(b).mult( 0.5 );
-
-    return mass*(length*length/12 + offset.lengthsq());
+    var offset = a.add(b).mult(0.5);
+    return mass * (b.distsq(a)/12 + offset.lengthsq());
   };
   
   
@@ -805,7 +817,7 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
   Shape.Poly.areaFor = function(verts){
     var area = 0;
     
-    for( var i = 0, l = verts.lengt; i < l; ++i ){
+    for( var i = 0, l = verts.length; i < l; ++i ){
       area += verts[i].cross( verts[(i+1)%l] );
     }
     
@@ -821,7 +833,7 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     var sum = 0;
     var vsum = Vect.zero;
     
-    for( var i = 0, l = verts.lengt; i < l; ++i ){
+    for( var i = 0, l = verts.length; i < l; ++i ){
       var v1 = verts[i];
       var v2 = verts[(i+1)%l];
       var cross = v1.cross(v2);
@@ -832,7 +844,14 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     
     return vsum.mult( 1 / (3*sum) );
   };
-
+  
+  Shape.Poly.recenter = function(verts){
+    var centroid = Shape.Poly.centroidFor( verts );
+    for( var i = 0, l = verts.length; i < l; ++i ){
+      verts[i] = verts[i].sub(centroid);
+    }
+    return verts;
+  };
 
   /**
    * Because boxes are so common in physics games, Chipmunk provides shortcuts to create box shaped polygons. The boxes will always be centered at the center of gravity of the body you are attaching them to.
@@ -864,7 +883,7 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
    * @function momentFor
    * @param {number} m
    * @param {number} width
-   * @param {height} height
+   * @param {number} height
    */
   Shape.Box.momentFor = function(m, width, height){
     return m*(width*width + height*height)/12;

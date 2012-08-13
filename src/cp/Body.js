@@ -13,6 +13,7 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     this.idleTime = idleTime;
   };
 
+
   /**
    * Chipmunk's rigid body struct.
    * @class Body
@@ -176,7 +177,7 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     
     filterConstraints: function(node, filter){
       if( node === filter ){
-        return node.next(body);
+        return node.next(this);
       }else if( node.a === this ){
         node.next_a = this.filterConstraints(node.next_a, filter);
       }else{
@@ -363,7 +364,6 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
         space.sleepingComponents.push(this);
       }
       arrays.deleteObj(space.bodies, this);
-    
     },
     
     /**
@@ -503,7 +503,7 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
      * @param {cp.Vect} r
      */
     getVelAtPoint: function(r){
-      return body.v.add( r.perp().mult(body.w) );
+      return this.v.add( r.perp().mult(this.w) );
     },
     
     getVelAtWorldPoint: function(point){
@@ -575,7 +575,7 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
       // Rogue bodies cannot be put to sleep and prevent bodies they are touching from sleepining anyway.
       // Static bodies (which are a type of rogue body) are effectively sleeping all the time.
       if( !body.isRogue() ){
-        var other_root = body && body.componentRoot();
+        var other_root = body.componentRoot();
         if( !other_root ){
           this.componentAdd(body);
           for( var arb = body.arbiterList; arb; arb = arb.next(body) ){
@@ -590,6 +590,7 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
       }
     }
   };
+
 
   /**  @namespace cp */
   /**

@@ -116,8 +116,9 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
     this.rousedBodies = [];
     this.arbiters = [];
     //this.pooledArbiters = [];
-    this.contactBuffersHead = undefined;
-    this.cachedArbiters = new HashSet(0, function(shapes, arb){
+
+    this.cachedArbiters = new HashSet(0, function(shapes){
+      var arb = this;
       var a = shapes[0];
       var b = shapes[1];
       return ((a === arb.a && b === arb.b) || (b === arb.a && a === arb.b));
@@ -346,7 +347,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
     removeBody: function(body){
       assert.hard( this.containsBody(body), 'Cannot remove a body that was not added to the space. (Removed twice maybe?)');
       body.activate();
-      //this.filterArbiters(body, undefined);
+      this.filterArbiters(body, undefined);
       arrays.deleteObj(this.bodies, body);
       body.space = undefined;
     },
@@ -687,7 +688,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       var constraints = this.constraints;
       for( var i = 0; i < arbiters.length; ++i ){
         var arb = arbiters[i];
-        //arb.state = Arbiter.State.normal; // TODO: why the fuck do my collision just flip out of control with this in?
+        arb.state = Arbiter.State.normal; 
         // If both bodies are awake, unthread the arbiter from the contact graph
         if( !arb.body_a.isSleeping() && !arb.body_b.isSleeping() ){
           arb.unthread(); // TODO
@@ -700,7 +701,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
         // Integrate positions
         for( var i = 0; i < bodies.length; ++i ){
           var body = bodies[i];
-          body.position_func(dt);
+          body.position_func(dt, true);
         }
         // Find colliding pairs.
         //this.pushFreshContactBuffer();
@@ -710,7 +711,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       this.unlock(false);
       
       // rebuild the contact graph (and detect sleeping components if sleeping is enabled)
-      //this.processComponents(dt); // TODO: floodFillComponents causes infinite loop. Enable sleeping if bug is fixed
+      this.processComponents(dt); // TODO: floodFillComponents causes infinite loop. Enable sleeping if bug is fixed
       
       this.lock();{
         // Clear out old cached arbiters and call separate callbacks
@@ -806,7 +807,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       var arbHashID = hash_pair(a.hash, b.hash); 
       
       var arb = space.cachedArbiters.insert(arbHashID, shapePair, space, Space.prototype.arbiterSetTrans);
-      arb.update(contacts, /*numContacts,*/ handler, a, b); 
+      arb.update(contacts, handler, a, b); 
       
       // Call the begin function first if it's the first step
       if( arb.state === Arbiter.State.firstColl && !handler.begin(arb, space, handler.data) ){
@@ -815,7 +816,10 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       if( (arb.state !== Arbiter.State.ignore) && // Ignore the arbiter if it has been flagged
           handler.preSolve(arb, space, handler.data) && // Call preSolve
           !sensor ){ // Process, but don't add collisions for sensors.
-          space.arbiters.push(arb);
+          //if( !arrays.contains( space.arbiters, arb ) ){
+            space.arbiters.push(arb);
+         // }
+          
       }else{
         //space.popContacts(numContacts);
         arb.contacts = undefined;
@@ -848,8 +852,16 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       return this.collisionHandlers.find( hash_pair(a, b), types );
     },
     
-    arbiterSetTrans:  function(shapes, space){ // NOTE: space not used right now.. because there is no object pooling (yet).
-      return new Arbiter( shapes[0], shapes[1] );
+    arbiterSetTrans:  function(shapes, space){ 
+      var arb;
+      if( false && space.pooledArbiters.length ){ // dead for now
+        arb = space.pooledArbiters.pop();
+        Arbiter.call( arb, shapes[0], shapes[1] );
+      }else{
+        arb = new Arbiter( shapes[0], shapes[1] );
+      }
+
+      return arb;
     },
     
     // Hashset filter func to throw away old arbiters.
@@ -911,7 +923,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       // Calculate the kinetic energy of all the bodies.
       if( sleep ){
         var dv = this.idleSpeedThreshold;
-        var dvsq = dv ? dv*dv : this.gravity.lengthsq() * dt * dt;
+        var dvsq = dv ? dv*dv : (this.gravity.lengthsq() * dt * dt);
         
         // update idling and reset component nodes
         for( var i = 0, l = bodies.length; i < l; ++i ){
@@ -957,7 +969,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
           }
         }
         // Generate components and deactivate sleeping ones
-        for( var i = 0, l = bodies.length; i < l; ){
+        for( var i = 0; i < bodies.length; ){
           var body = bodies[i];
           
           if( !body.componentRoot() ){
@@ -966,7 +978,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
             body.floodFillComponent(body);
             
             // Check if the component should be put to sleep.
-            if( body.componentActive(this.sleepTimeThreshold) ){
+            if( !body.componentActive(this.sleepTimeThreshold) ){
               this.sleepingComponents.push(body);
               for( var other = body; other; other = other.node.next ){
                 this.deactivateBody( other );
@@ -980,6 +992,68 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
           // Only sleeping bodies retain their component node pointers.
           body.node.root = undefined;
           body.node.next = undefined;
+        }
+      }
+    },
+    
+    activateBody: function(body){
+      assert.hard( !body.isRogue(), "Internal error: Attempting to activate a rouge body." );
+      
+      if( this.locked ){
+        // cpSpaceActivateBody() is called again once the space is unlocked
+        if( ! arrays.contains( this.rousedBodies, body ) ){
+          this.rousedBodies.push(body);
+        }
+      }else{
+        this.bodies.push(body);
+        for( var shape = body.shapeList; shape; shape = shape.next ){
+          this.staticShapes.remove( shape, shape.hashid );
+          this.activeShapes.insert( shape, shape.hashid );
+        }
+        for( var arb = body.arbiterList; arb; arb = arb.next(body) ){
+          var bodyA = arb.body_a;
+          if( body === bodyA || bodyA.isStatic() ){
+            var numContacts = arb.numContacts;
+            var contacts = arb.contacts;
+            // Reinsert the arbiter into the arbiter cache
+            var a = arb.a;
+            var b = arb.b;
+            var shape_pair = [ a, b ];
+            var arbHashID = hash_pair( a.hash, b.hash );
+            this.cachedArbiters.insert( arbHashID, shape_pair, arb, undefined );
+            // Update the arbiter's state
+            arb.stamp = this.stamp;
+            arb.handler = this.lookupHandler( a.collision_type, b.collision_type );
+            this.arbiters.push( arb );
+          }
+        }
+        for( var constraint = body.constraintList; constraint; constraint = constraint.next(body) ){
+          var bodyA = constraint.a;
+          if( body === bodyA || bodyA.isStatic() ){
+            this.constraints.push(constraint);
+          }
+        }
+      }
+    },
+    
+    deactivateBody: function(body){
+      assert.hard( !body.isRogue(), "Internal error: Attempting to deactivate a rouge body." );
+      arrays.deleteObj( this.bodies, body );
+      
+      for( var shape = body.shapeList; shape; shape = shape.next ){
+        this.activeShapes.remove( shape, shape.hashid );
+        this.staticShapes.insert( shape, shape.hashid );
+      }
+      for( var arb = body.arbiterList; arb; arb = arb.next(body) ){
+        var bodyA = arb.body_a;
+        if( body === bodyA || bodyA.isStatic() ){
+          this.uncacheArbiter(arb);
+        }
+      }
+      for( var constraint = body.constraintList; constraint; constraint = constraint.next(body) ){
+        var bodyA = constraint.a;
+        if( body === bodyA || bodyA.isStatic() ){
+          arrays.deleteObj( this.constraints, constraint );
         }
       }
     }

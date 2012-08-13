@@ -4,7 +4,10 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
   /// The cpArbiter struct controls pairs of colliding shapes.
   /// They are also used in conjuction with collision handler callbacks
   /// allowing you to retrieve information on the collision and control it.
-
+  var vdot = function(x1, y1, x2, y2){
+    return x1*x2 + y1*y2;
+  };
+  
   var counter = 0;
 
   var MAX_CONTACTS_PER_ARBITER = 10;
@@ -22,27 +25,29 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
   };
   
   var Arbiter = function(a, b){
-    this.swappedColl = false;
-    this.e = 0;
-    this.u = 0;
-    this.surface_vr = Vect.zero;
-    this.numContacts = 0;
-    
-    this.a = a;
-    this.body_a = a.body;
-    this.b = b;
-    this.body_b = b.body;
-    
-    this.counter = ++counter;
+    if( a && b ){
+      this.swappedColl = false;
+      this.e = 0;
+      this.u = 0;
+      this.surface_vr = Vect.zero;
+      this.numContacts = 0;
+      
+      this.a = a;
+      this.body_a = a.body;
+      this.b = b;
+      this.body_b = b.body;
+      
+      this.counter = ++counter;
 
-    
-    this.stamp = 0;
-    this.state = ArbiterState.firstColl;
-    
-    this.contacts = [];
-    
-    this.thread_a = {};
-    this.thread_b = {};
+      
+      this.stamp = 0;
+      this.state = ArbiterState.firstColl;
+      
+      this.contacts = [];
+      
+      this.thread_a = {};
+      this.thread_b = {};
+    }
   };
  
   Arbiter.State = ArbiterState;
@@ -187,7 +192,7 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
       }
     },
 
-    applyImpulse: function(){
+    __applyImpulse: function(){
       var a = this.body_a;
       var b = this.body_b;
       
@@ -234,7 +239,65 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
         // Apply the final impulse.
         util.apply_impulses( a, b, r1, r2, n.rotate( new Vect(jn, jt) ) );
       }
+      
     },
+    applyImpulse: function(){
+      //if (!this.contacts) { throw new Error('contacts is undefined'); }
+      var a = this.body_a;
+      var b = this.body_b;
+      var surface_vr = this.surface_vr;
+      var friction = this.u;
+
+      var _ = new Vect(0, 0);
+      for(var i=0; i<this.contacts.length; i++){
+        var con = this.contacts[i];
+        var nMass = con.nMass;
+        var n = con.n;
+        var r1 = con.r1;
+        var r2 = con.r2;
+        
+        //var vr = relative_velocity(a, b, r1, r2);
+        var vrx = b.v.x - r2.y * b.w - (a.v.x - r1.y * a.w);
+        var vry = b.v.y + r2.x * b.w - (a.v.y + r1.x * a.w);
+        
+        //var vb1 = vadd(vmult(vperp(r1), a.w_bias), a.v_bias);
+        //var vb2 = vadd(vmult(vperp(r2), b.w_bias), b.v_bias);
+        //var vbn = vdot(vsub(vb2, vb1), n);
+
+        var vbn = n.x*(b.v_bias.x - r2.y * b.w_bias - a.v_bias.x + r1.y * a.w_bias) + n.y*(r2.x*b.w_bias + b.v_bias.y - r1.x * a.w_bias - a.v_bias.y);
+
+        var vrn = vdot(vrx, vry, n.x, n.y);
+        //var vrt = vdot(vadd(vr, surface_vr), vperp(n));
+        var vrt = vdot(vrx + surface_vr.x, vry + surface_vr.y, -n.y, n.x);
+        
+        var jbn = (con.bias - vbn)*nMass;
+        var jbnOld = con.jBias;
+        con.jBias = Math.max(jbnOld + jbn, 0);
+        
+        var jn = -(con.bounce + vrn)*nMass;
+        var jnOld = con.jnAcc;
+        con.jnAcc = Math.max(jnOld + jn, 0);
+        
+        var jtMax = friction*con.jnAcc;
+        var jt = -vrt*con.tMass;
+        var jtOld = con.jtAcc;
+        con.jtAcc = cpf.clamp(jtOld + jt, -jtMax, jtMax);
+        
+        //apply_bias_impulses(a, b, r1, r2, vmult(n, con.jBias - jbnOld));
+        var bias_x = n.x * (con.jBias - jbnOld);
+        var bias_y = n.y * (con.jBias - jbnOld);
+        util.apply_bias_impulse(a, new Vect(-bias_x, -bias_y), r1);
+        util.apply_bias_impulse(b, new Vect(bias_x, bias_y), r2);
+
+        //apply_impulses(a, b, r1, r2, vrotate(n, new Vect(con.jnAcc - jnOld, con.jtAcc - jtOld)));
+        var rot_x = con.jnAcc - jnOld;
+        var rot_y = con.jtAcc - jtOld;
+
+        util.apply_impulses(a, b, r1, r2, new Vect(n.x*rot_x - n.y*rot_y, n.x*rot_y + n.y*rot_x) );
+      }
+    },
+    
+    
     
     getElasticity: function(){
       return this.e;

@@ -3,7 +3,7 @@ define(['cp/BB', 'cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Pri
   "use strict";
  
   var leafSetEql = function(node){
-    return (this === node.obj);
+    return (this.obj === node);
   }; 
   
   var leafSetTrans = function(obj, tree){
@@ -21,7 +21,7 @@ define(['cp/BB', 'cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Pri
   }; 
   
   var proximity = function(a, b){
-    return Math.abs(a.l + a.r - b.l - b.r) + Math.abs(a.b + b.t - b.b - b.t);
+    return Math.abs(a.l + a.r - b.l - b.r) + Math.abs(a.b + a.t - b.b - b.t);
   };
  
   var MarkContext = function(tree, staticRoot, func, data){
@@ -456,7 +456,7 @@ define(['cp/BB', 'cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Pri
       var leaf = this.leaves.remove(hashid, obj);
       if( leaf ){
         this.root = this.root.subtreeRemove(leaf, this);
-        leaf.pairsClear(this);
+        this.pairsClear(this);
         //this.nodeRecycle(leaf);
       }
     },
