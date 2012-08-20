@@ -3,7 +3,6 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/Prime'], fun
   var HashSetBin = {};
   
   var HashSet = function(size, eqlFunc){
-    this.size = Number.INFINITY; //prime.last();
     this.entries = 0;
     this.eql = eqlFunc;
     this.default_value = undefined;

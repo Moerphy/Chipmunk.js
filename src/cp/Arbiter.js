@@ -52,6 +52,22 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
  
   Arbiter.State = ArbiterState;
  
+ /*
+  * TODO
+cpBool cpArbiterIsFirstContact(const cpArbiter *arb)
+{
+        return arb->CP_PRIVATE(state) == cpArbiterStateFirstColl;
+}
+
+int cpArbiterGetCount(const cpArbiter *arb)
+{
+        // Return 0 contacts if we are in a separate callback.
+        return (arb->CP_PRIVATE(state) != cpArbiterStateCached ? arb->CP_PRIVATE(numContacts) : 0);
+}
+  * TODO: .numCount -> .getCount()
+  */ 
+  
+ 
   Arbiter.prototype = {
     getNormal: function(i){
       if( 0 <= i && i < this.numContacts ){
@@ -177,70 +193,12 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
       for( var i =0 ; this.contacts && i < this.numContacts; ++i ){
         var con = this.contacts[i];
         if( con ){
-          //*
           var j = con.n.rotate( new Vect(con.jnAcc, con.jtAcc) );
           util.apply_impulses( a, b, con.r1, con.r2, j.mult(dt_coef) );
-          //*/
-          /*
-          var nx = con.n.x;
-          var ny = con.n.y;
-          var jx = nx*con.jnAcc - ny*con.jtAcc;
-          var jy = nx * con.jtAcc + ny * con.jnAcc;
-          apply_impulses(a, b, con.r1, con.r2, new Vect(jx * dt_coef, jy * dt_coef) );
-          //*/
         }
       }
     },
 
-    __applyImpulse: function(){
-      var a = this.body_a;
-      var b = this.body_b;
-      
-      for( var i =0; this.contacts && i < this.contacts.length; ++i ){
-        var con = this.contacts[i];
-        var n = con.n;
-        var r1 = con.r1;
-        var r2 = con.r2;
-        
-        // Calculate the relative bias velocities.
-        var vb1 = a.v_bias.add(r1.perp().mult(a.w_bias));
-        var vb2 = b.v_bias.add(r2.perp().mult(b.w_bias));
-        var vbn = vb2.sub(vb1).dot(n);
-        
-        // Calculate and clamp the bias impulse.
-        var jbn = (con.bias-vbn)*con.nMass;
-        var jbnOld = con.jBias;
-        
-        con.jBias = Math.max(jbnOld+jbn, 0);
-        jbn = con.jBias - jbnOld;
-        
-        // Apply the bias impulse.
-        util.apply_bias_impulses( a, b, r1, r2, n.mult(jbn) );
-        
-        // Calculate the relative velocity.
-        var vr = util.relative_velocity( a, b, r1, r2 );
-        var vrn = vr.dot(n);
-        
-        // Calculate and clamp the normal impulse.
-        var jn = -(con.bounce+vrn)*con.nMass;
-        var jnOld = con.jnAcc;
-        con.jnAcc = Math.max(jnOld + jn, 0);
-        jn = con.jnAcc - jnOld;
-        
-        // Calculate the relative tangent velocity.
-        var vrt = vr.add(this.surface_vr).dot( n.perp() );
-        
-        // Calculate and clamp the friction impulse.
-        var jtMax = this.u*con.jnAcc;
-        var jt = -vrt*con.tMass;
-        var jtOld = con.jtAcc;
-        con.jtAcc = cpf.clamp(jtOld + jt, -jtMax, jtMax);
-        jt = con.jtAcc - jtOld;
-        // Apply the final impulse.
-        util.apply_impulses( a, b, r1, r2, n.rotate( new Vect(jn, jt) ) );
-      }
-      
-    },
     applyImpulse: function(){
       //if (!this.contacts) { throw new Error('contacts is undefined'); }
       var a = this.body_a;
@@ -248,7 +206,6 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
       var surface_vr = this.surface_vr;
       var friction = this.u;
 
-      var _ = new Vect(0, 0);
       for(var i=0; i<this.contacts.length; i++){
         var con = this.contacts[i];
         var nMass = con.nMass;
@@ -384,7 +341,7 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array'], function(Vect, 
         var con = contacts[i];
         var jnAcc = con.jnAcc;
         var jtAcc = con.jtAcc;
-        sum + eCoef * jnAcc * jnAcc / con.nMass  +  jAcc * jtAcc / con.tMass;
+        sum += eCoef * jnAcc * jnAcc / con.nMass  +  jtAcc * jtAcc / con.tMass;
       }
       return sum;
     },

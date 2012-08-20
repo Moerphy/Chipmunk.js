@@ -12,6 +12,9 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     this.next = next;
     this.idleTime = idleTime;
   };
+  
+  ComponentNode.prototype = {
+  };
 
 
   /**
@@ -208,8 +211,10 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
      * @function setAngle
      * @param {number} angle
      */
-    setAngle: function(angle){
-      this.activate();
+    setAngle: function(angle, activate){
+      if( activate ){
+        this.activate();
+      }
       this.a = angle;
       this.rot = Vect.forangle(angle);
     },
@@ -227,7 +232,7 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     
     updatePosition: function(dt){
       this.p = this.p.add( this.v.add(this.v_bias).mult(dt) );
-      this.setAngle(this.a + (this.w + this.w_bias)*dt);
+      this.setAngle(this.a + (this.w + this.w_bias)*dt, false);
       
       this.v_bias = Vect.zero;
       this.w_bias = 0;
@@ -262,7 +267,6 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
       this.activate();
       this.v = this.v.add( j.mult(this.m_inv) );
       this.w += this.i_inv * r.cross(j);
-      //util.apply_impulse(this, j, r); 
     },
     
     /**
@@ -312,7 +316,7 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
 
     activate: function(){
       if( !this.isRogue() ){
-        var root = this.componentRoot();
+        var root = this && this.componentRoot();
         if( root ){
           root.componentActivate();
         }
@@ -354,7 +358,7 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
       }
       space.deactivateBody(this);
       if( group ){
-        var root = group.componentRoot();
+        var root = group && group.componentRoot();
         var node = new ComponentNode(root, root.node.next, 0);
         this.node = node;
         root.node.next = this;
@@ -430,7 +434,7 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
      * @function getVelLimit
      */
     getVelLimit: function(){
-      return this.v_limit
+      return this.v_limit;
     },
     /**
      * @function setVelLimit
@@ -574,8 +578,9 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
     floodFillComponent: function(body){
       // Rogue bodies cannot be put to sleep and prevent bodies they are touching from sleepining anyway.
       // Static bodies (which are a type of rogue body) are effectively sleeping all the time.
+      var root = this;
       if( !body.isRogue() ){
-        var other_root = body.componentRoot();
+        var other_root = (body && body.componentRoot());
         if( !other_root ){
           this.componentAdd(body);
           for( var arb = body.arbiterList; arb; arb = arb.next(body) ){

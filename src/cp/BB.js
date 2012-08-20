@@ -1,4 +1,4 @@
-define(['cp/Vect', /*'chipmunk/private'*/], function(Vect, cpPrivate){
+define(['cp/Vect'], function(Vect){
   "use strict";
   /**
    * Chipmunk's axis-aligned 2D bounding box type along with a few handy routines.

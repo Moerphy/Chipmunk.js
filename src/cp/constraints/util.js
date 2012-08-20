@@ -17,8 +17,8 @@ define(['cp/Vect'], function(Vect){
     },
     
     apply_impulses: function(a, b, r1, r2, j){
-      a.applyImpulse(j.neg(), r1, true);
-      b.applyImpulse(j, r2, true); 
+      this.apply_impulse(a, j.neg(), r1);
+      this.apply_impulse(b, j, r2); 
     },
     
     apply_bias_impulse: function(body, j, r){

@@ -30,7 +30,7 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     this.surface_v = Vect.zero;
     this.collision_type = 0;
     this.group = 0; // CP_NO_GROUP
-    this.layers = ~0;// CP_ALL_LAYERS
+    this.layers = ~~(Math.pow(2,31)-1);// CP_ALL_LAYERS
     
     this.next = undefined;
     this.prev = undefined;
@@ -239,14 +239,14 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
      * @function segmentQuery
      */
     segmentQuery: function(a,b){
-      throw "Not implemented, don't use Shape class directly. Use a subclass (Circle, Segment or Polygon)"
+      throw "Not implemented, don't use Shape class directly. Use a subclass (Circle, Segment or Polygon)";
     },
 
     destroy: function(){
-      throw "Not implemented, don't use Shape class directly. Destroy is only implemented on POlygons."
+      throw "Not implemented, don't use Shape class directly. Destroy is only implemented on POlygons.";
     },
     cacheData: function(pos, rot){
-      throw "Not implemented, don't use Shape class directly. Use a subclass (Circle, Segment or Polygon)"
+      throw "Not implemented, don't use Shape class directly. Use a subclass (Circle, Segment or Polygon)";
     },
     
     copyShapes: function(index){
@@ -276,7 +276,7 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
         a.body === b.body ||
         // Don't collide objects in the same non-zero group
         (a.group && (a.group === b.group)) ||
-        // Don't collide objects that don't share at least on layer.
+        // Don't collide objects that don't share at least one layer.
         !(a.layers & b.layers)
       );
     }

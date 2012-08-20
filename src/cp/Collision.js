@@ -34,8 +34,8 @@ define(['cp/Contact', 'cp/Hash', 'cp/Vect', 'cp/cpf'], function(Contact, hash_pa
     if( circle2circleQuery(center, closest, circ.r, seg.r, con) ){
       var n = con[0].n;
       // Reject endcap collisions if tangents are provided.
-      if( (closest_t == 0 && n.dot(seg.a_tangent) < 0) ||
-          (closest_t == 1 && n.dot(seg.b_tangent) < 0) ){
+      if( (closest_t === 0 && n.dot(seg.a_tangent) < 0) ||
+          (closest_t === 1 && n.dot(seg.b_tangent) < 0) ){
         return 0;
       }
 		

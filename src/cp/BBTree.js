@@ -96,15 +96,15 @@ define(['cp/BB', 'cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Pri
           cost_a = proximity( this.a.bb, leaf.bb );
           cost_b = proximity( this.b.bb, leaf.bb );
         }
-        
+        var ins;
         if( cost_b < cost_a ){
-          var ins = leaf;
+          ins = leaf;
           if( this.b ){
-            ins =this.b.subtreeInsert(leaf, tree);
+            ins = this.b.subtreeInsert(leaf, tree);
           }
           this.setB( ins );
         }else{
-          var ins = leaf;
+          ins = leaf;
           if( this.a ){
             ins = this.a.subtreeInsert(leaf, tree);
           }
@@ -152,7 +152,7 @@ define(['cp/BB', 'cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Pri
         return t_exit;
       }
     }, 
-    
+
     subtreeRemove: function(leaf, tree){
       if( leaf === this ){
         return undefined;
@@ -196,6 +196,7 @@ define(['cp/BB', 'cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Pri
     
     addPairs: function(tree){
       var dynamicIndex = tree.dynamicIndex;
+      
       if( dynamicIndex ){
         var dynamicRoot = dynamicIndex.root;
         if( dynamicRoot ){
@@ -299,7 +300,7 @@ define(['cp/BB', 'cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Pri
   };
 
   var Thread = function(prev, leaf, next){
-    this.prev = prev
+    this.prev = prev;
     this.leaf = leaf;
     this.next = next;
   };
@@ -423,12 +424,16 @@ define(['cp/BB', 'cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Pri
       while( pair ){
         if( pair.a.leaf === leaf ){
           var next = pair.a.next;
-          pair.b && pair.b.unlink && pair.b.unlink();
+          if( pair.b && pair.b.unlink ){
+            pair.b.unlink();
+          }
           //this.pairRecycle(pair);
           pair = next;
         }else{
           var next = pair.b.next;
-          pair.a && pair.a.unlink && pair.a.unlink();
+          if( pair.a && pair.a.unlink ){
+            pair.a.unlink();
+          }
           //this.pairRecycle(pair);
           pair = next;
         }

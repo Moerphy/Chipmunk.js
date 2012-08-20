@@ -6,8 +6,8 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
   "use strict";
 
   // Default collision functions.
-  var alwaysCollide = function(/* arb, */ space, data){ return true; }
-  var nothing = function(space, data){}
+  var alwaysCollide = function(/* arb, */ space, data){ return true; };
+  var nothing = function(space, data){};
   
   // cpCollisionHandler cpDefaultCollisionHandler = {0, 0, alwaysCollide, alwaysCollide, nothing, nothing, NULL};
   var defaultCollisionHandler = new CollisionHandler(0,0,alwaysCollide, alwaysCollide, nothing, nothing, undefined); 
@@ -15,6 +15,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
 
   // callback from the spatial hash
   var shapeQueryHelper = function(b, context){
+    var a = this;
     if( (a.group && a.group === b.group) ||
         !(a.layers & b.layers) ||
         a === b ){
@@ -131,7 +132,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
     }); 
     
     this.collisionHandlers.setDefaultValue(defaultCollisionHandler);
-    this.postStepCallbacks = undefined;
+    this.postStepCallbacks = [];
   };
  
  /**
@@ -697,80 +698,82 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       this.arbiters = arbiters = [];
       
       
-      this.lock(); {
-        // Integrate positions
-        for( var i = 0; i < bodies.length; ++i ){
-          var body = bodies[i];
-          body.position_func(dt, true);
-        }
-        // Find colliding pairs.
-        //this.pushFreshContactBuffer();
-        this.activeShapes.each(Shape.prototype.updateFunc, undefined);
-        this.activeShapes.reindexQuery(this.collideShapes, this);
-      } 
+      this.lock(); 
+      
+      // Integrate positions
+      for( var i = 0; i < bodies.length; ++i ){
+        var body = bodies[i];
+        body.position_func(dt);
+      }
+      // Find colliding pairs.
+      //this.pushFreshContactBuffer();
+      this.activeShapes.each(Shape.prototype.updateFunc, undefined);
+      this.activeShapes.reindexQuery(this.collideShapes, this);
+      
       this.unlock(false);
       
       // rebuild the contact graph (and detect sleeping components if sleeping is enabled)
       this.processComponents(dt); // TODO: floodFillComponents causes infinite loop. Enable sleeping if bug is fixed
       
-      this.lock();{
-        // Clear out old cached arbiters and call separate callbacks
-        this.cachedArbiters.filter( Space.prototype.arbiterSetFilter, this );
-        // Prestep the arbiters and constraints.
-        var slop = this.collisionSlop;
-        var biasCoef = 1 - Math.pow( this.collisionBias, dt );
-          
-        for( var i = 0; i < arbiters.length; ++i ){ 
-          arbiters[i].preStep(dt, slop, biasCoef);
+      this.lock();
+      
+      // Clear out old cached arbiters and call separate callbacks
+      this.cachedArbiters.filter( Space.prototype.arbiterSetFilter, this );
+      // Prestep the arbiters and constraints.
+      var slop = this.collisionSlop;
+      var biasCoef = 1 - Math.pow( this.collisionBias, dt );
+        
+      for( var i = 0; i < arbiters.length; ++i ){ 
+        arbiters[i].preStep(dt, slop, biasCoef);
+      }
+      for( var i = 0; i  < constraints.length; ++i ){
+        var constraint = constraints[i];
+        
+        if( constraint.preSolve ){
+          constraint.preSolve(this);
         }
-        for( var i = 0; i  < constraints.length; ++i ){
-          var constraint = constraints[i];
-          
-          if( constraint.preSolve ){
-            constraint.preSolve(this);
-          }
-          constraint.preStep(dt);
+        constraint.preStep(dt);
+      }
+      // Integrate velocities.
+      var damping = Math.pow(this.damping, dt);
+      var gravity = this.gravity;
+      for( var i = 0; i < bodies.length; ++i ){
+        var body = bodies[i];
+        body.velocity_func(gravity, damping, dt);
+      }
+      // Apply cached impulses
+      var dt_coef = (prev_dt === 0? 0 : dt/prev_dt);
+      for( var i = 0; i < arbiters.length; ++i ){
+        arbiters[i].applyCachedImpulse(dt_coef);
+      }
+      for( var i = 0; i < constraints.length; ++i ){
+        var constraint = constraints[i];
+        constraint.applyCachedImpulse(dt_coef);
+      }
+      // Run the impulse solver
+      for( var i = 0; i < this.iterations; ++i ){
+        for( var j = 0; j < arbiters.length; ++j ){
+          arbiters[j].applyImpulse();
         }
-        // Integrate velocities.
-        var damping = Math.pow(this.damping, dt);
-        var gravity = this.gravity;
-        for( var i = 0; i < bodies.length; ++i ){
-          var body = bodies[i];
-          body.velocity_func(gravity, damping, dt);
+        for( var j = 0; j < constraints.length; ++j ){
+          var constraint = constraints[j];
+          constraint.applyImpulse();
         }
-        // Apply cached impulses
-        var dt_coef = (prev_dt === 0? 0 : dt/prev_dt);
-        for( var i = 0; i < arbiters.length; ++i ){
-          arbiters[i].applyCachedImpulse(dt_coef);
+      }
+      // Run the constraint post-solve callbacks
+      for( var i = 0; i < constraints.length; ++i ){
+        var constraint = constraints[i];
+        if( constraint.postSolve ){
+            constraint.postSolve(this);
         }
-        for( var i = 0; i < constraints.length; ++i ){
-          var constraint = constraints[i];
-          constraint.applyCachedImpulse(dt_coef);
-        }
-        // Run the impulse solver
-        for( var i = 0; i < this.iterations; ++i ){
-          for( var j = 0; j < arbiters.length; ++j ){
-            arbiters[j].applyImpulse();
-          }
-          for( var j = 0; j < constraints.length; ++j ){
-            var constraint = constraints[j];
-            constraint.applyImpulse();
-          }
-        }
-        // Run the constraint post-solve callbacks
-        for( var i = 0; i < constraints.length; ++i ){
-          var constraint = constraints[i];
-          if( constraint.postSolve ){
-              constraint.postSolve(space);
-          }
-        }
-        // Run the post-solve callbacks
-        for( var i = 0; i < arbiters.length; ++i ){
-          var arb = arbiters[i];
-          var handler = arb.handler;
-          handler.postSolve.call(this, handler.data);
-        }
-      } 
+      }
+      // Run the post-solve callbacks
+      for( var i = 0; i < arbiters.length; ++i ){
+        var arb = arbiters[i];
+        var handler = arb.handler;
+        handler.postSolve.call(this, handler.data);
+      }
+    
       this.unlock(true);
     },
 
@@ -822,7 +825,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
           
       }else{
         //space.popContacts(numContacts);
-        arb.contacts = undefined;
+        arb.contacts.length = 0;
         arb.numContacts = 0;
         // Normally arbiters are set as used after calling the post-solve callback.
         // However, post-solve callbacks are not called for sensors or arbiters rejected from pre-solve.
@@ -834,16 +837,48 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       arb.stamp = space.stamp;
     },
 
-    postStepCallbackSetIter: function(callback, space){
-      callback.func.call(space, callback.obj, callback.data);
+    /**
+     * Add func to be called before cpSpaceStep() returns. obj and data will be passed to your function. 
+     * Only the last callback registered for any unique value of obj will be recorded. 
+     * You can add postStep() callbacks from outside of other callback functions, but there isn’t a good reason to and they won’t be called until the next time cpSpaceStep() is finishing.
+     * @param {function} func callback function. Will be called with the space as context, key and data as parameter: function func(key, data){ //this == space  }
+     * @param {object} [key=undefined] key for this callback. Used to make sure there is only one callback for a key. Will be passed as the first argument into the callback
+     * @param {object} [data=undefined] data for this callback. Will be passed as second argument in the callbakc
+     * @return {boolean} true if callback was added, false if not (callback for this key already added)
+     */
+    addPostStepCallback: function(func, key, data){
+      if( !this.getPostStepCallback(key) ){
+        var callback = { 
+          func: func || nothing,
+          key: key,
+          data: data
+        };
+        this.postStepCallbacks.push(callback);
+        return true;
+      }
+      return false;
+    },
+
+    getPostStepCallback: function(key){
+      var arr = this.postStepCallbacks;
+      for( var i = 0; i < arr.length; ++i ){
+        var callback = arr[i];
+        if( callback.key === key ){
+          return callback;
+        }
+      }
     },
     
     runPostStepCallbacks: function(){
       // Loop because post step callbacks may add more post step callbacks directly or indirectly.
-      while( this.postStepCallbacks ){
+      while( this.postStepCallbacks.length ){
         var callbacks = this.postStepCallbacks;
-        this.postStepCallbacks = undefined;
-        callbacks.each( this.postStepCallbackSetIter, this );
+        var l = callbacks.length;
+        for( var i = 0; i < l; ++i ){
+          var c = callbacks[i];
+          c.func.call(this, c.obj, c.data);
+        }
+        this.postStepCallbacks.splice(0, l);
       }
     },
     
@@ -880,7 +915,7 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
         arb.state = Arbiter.State.cached;
       }
       if( ticks >= space.collisionPersistence ){
-        arb.contacts = undefined;
+        arb.contacts.length = 0;
         arb.numContacts = 0;
         //space.pooledArbiters.push(arb);
         return false;
