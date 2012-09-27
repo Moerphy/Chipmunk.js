@@ -1,5 +1,5 @@
 define([], {
-  debugging: false,
+  debugging: true,
   
   hard: function(condition, message){
     if( !condition ){

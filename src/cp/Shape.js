@@ -388,7 +388,20 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
      */
     setRadius: function(r){
       this.r = r;
+    },
+    
+    nearestPointQuery: function(p){
+      var delta = p.sub(this.tc);
+      var d = delta.length();
+      var r = this.r;
+      
+      return {
+        shape: this,
+        p: this.tc.add(delta.mult(r/d)),
+        d: d-r
+      };
     }
+    
     
   });
 
@@ -581,6 +594,19 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     setNeighbors: function(prev, next){
       this.a_tangent = prev.sub(this.a);
       this.b_tangent = next.sub(this.b);
+    },
+    
+    nearestPointQuery: function(p){
+      var closest = Shape.Segment.closestPointOn(p, this.ta, this.tb);
+      var delta = p.sub(closest);
+      var d = delta.length();
+      var r = seg.r;
+      
+      return {
+        shape: this,
+        p: (d? closest.add(delta.mult(r/d)) : closest ),
+        d: d - r
+      };
     }
   });
 
@@ -596,7 +622,12 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
     var offset = a.add(b).mult(0.5);
     return mass * (b.distsq(a)/12 + offset.lengthsq());
   };
-  
+
+  Shape.Segment.closestPointOn = function(p, a, b){
+    var delta = a.sub(b);
+    var t = cpf.clamp01( delta.dot(p.sub(b)) / delta.lengthsq() );
+    return b.add( delta.mult(t) );
+  };
   
   /**
    * @namespace cp.Shape
@@ -781,6 +812,10 @@ define(['cp/Vect', 'cp/BB', 'cp/Contact', 'cp/constraints/util', 'cp/Collision']
       }
       
       return true;
+    },
+    
+    nearestPointQuery: function(){
+      throw "Shape.Poly.nearestPointQuery not yet implemented ):";
     }
     
   });

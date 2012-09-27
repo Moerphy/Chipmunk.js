@@ -13,6 +13,7 @@ define([], function(){
   };
   
   Vect.prototype = {
+    
     /**
      * Returns the length of v.
      * @return {Number} the length of the vector.
@@ -46,7 +47,7 @@ define([], function(){
      * Returns the angular direction v is pointing in (in radians).
      * @return {Number} Angular direction in radians.
      */
-    toangle: function(){
+    toAngle: function(){
       return Math.atan2(this.y, this.x);
     },
     

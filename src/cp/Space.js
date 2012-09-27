@@ -1,8 +1,8 @@
 /**
  * @namespace cp
  */
-define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceHash', 'cp/BBTree', 'cp/ContactBuffer', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/CollisionHandler', 'cp/Hash', 'cp/assert'], 
-    function(Body, Vect, Shape, Arbiter, HashSet, SpaceHash, BBTree, ContactBuffer, util,  cpf, arrays, CollisionHandler, hash_pair, assert){
+define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/BB', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceHash', 'cp/BBTree', 'cp/ContactBuffer', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/CollisionHandler', 'cp/Hash', 'cp/assert'], 
+    function(Body, Vect, Shape, BB, Arbiter, HashSet, SpaceHash, BBTree, ContactBuffer, util,  cpf, arrays, CollisionHandler, hash_pair, assert){
   "use strict";
 
   // Default collision functions.
@@ -35,14 +35,14 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
       context.anyCollision = !(a.sensor || b.sensor);
       
       if( context.func ){
-        var set = [];
+        var _set = [];
         for( var i = 0; i < contacts.length; ++i ){
-          set[i] = {};
-          set[i].point = contacts[i].p;
-          set[i].normal = contacts[i].n;
-          set[i].dist = contacts[i].dist;
+          _set[i] = {};
+          _set[i].point = contacts[i].p;
+          _set[i].normal = contacts[i].n;
+          _set[i].dist = contacts[i].dist;
         }
-        context.func.call(b, set, context.data);
+        context.func.call(b, _set, context.data);
       }
     }
   };
@@ -127,7 +127,8 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
 
     this.constraints = [];
     this.defaultHandler = defaultCollisionHandler;
-    this.collisionHandlers = new HashSet(0, function(check, pair){ 
+    this.collisionHandlers = new HashSet(0, function(check){ 
+      var pair = this;
       return ((check.a === pair.a && check.b === pair.b) || (check.b === pair.a && check.a === pair.b));
     }); 
     
@@ -1091,8 +1092,70 @@ define(['cp/Body', 'cp/Vect', 'cp/Shape', 'cp/Arbiter', 'cp/HashSet', 'cp/SpaceH
           arrays.deleteObj( this.constraints, constraint );
         }
       }
-    }
+    },
+
+    nearestPointQuery: function(point, maxDistance, layers, group, func, data){
+      var bb = new BB.forCircle( point, Math.max(maxDistance, 0) );
+      
+      this.lock();
+      var nearestPointQuery = function(shape, data){ // this = space
+        if( !(shape.group && group === shape.group) && (layers & shape.layers) ){
+          var info = shape.nearestPointQuery(point);
+          if( info.shape && info.d < maxDistance ){
+            func.call(shape, info.d, info.p, data);
+          }
+        }
+      };
+      this.activeShapes.query( this, bb, nearestPointQuery, data );  // function(obj, bb, func, data){
+      this.staticShapes.query( this, bb, nearestPointQuery, data ); 
+      this.unlock(true);
+    },
     
+    /**
+     * @param {cp.Vect} start
+     * @param {cp.Vect} end
+     * @param {number} layers
+     * @param {number} group
+     * @param {function} func function that is called for every shape found. Signature is: function(shape, t, n, data){} (t is the normalized distance along the query segment in the range [0, 1], n is the normal of the surface hit)
+     * @param {object} data
+     */
+    segmentQuery: function(start, end, layers, group, func, data){
+      this.lock();
+      
+      var segQueryFunc = function(shape, data){
+        var info;
+        if( !(shape.group && group === shape.group) && (layers&shape.layers) && (info = shape.segmentQuery(start, end)) ){
+          func( shape, info.t, info.n, data );
+        }
+        return 1.0;
+      };
+      this.staticShapes.segmentQuery(start, end, 1.0, segQueryFunc, data);
+      this.activeShapes.segmentQuery(start, end, 1.0, segQueryFunc, data);
+      
+      this.unlock(true);
+    },
+    
+    segmentQueryFirst: function(start, end, layers, group, data){
+      data = data || {};
+      var segQueryFirst = function(shape, out){
+        var info;
+        if( !(shape.group && group === shape.group) && (layers&shape.layers) &&
+            !shape.sensor &&
+            (info = shape.segmentQuery(start, end)) &&
+            info.t < out.t 
+        ){
+          out.shape = info.shape;
+          out.t = info.t;
+          out.n = info.n;
+        }
+        return out.t;
+      };
+      
+      this.staticShapes.segmentQuery(start, end, 1.0, segQueryFirst, data);
+      this.activeShapes.segmentQuery(start, end, 1.0, segQueryFirst, data);
+      
+      return data.shape;
+    }
   };
  
   return Space;

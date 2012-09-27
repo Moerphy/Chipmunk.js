@@ -127,26 +127,26 @@ define(['cp/BB', 'cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Pri
       }
     },
 
-    subtreeSegmentQuery: function(obj, a, b, t_exit, func, data){
+    subtreeSegmentQuery: function(a, b, t_exit, func, data){
       if( this.isLeaf() ){
-        return func(obj, this.obj, data);
+        return func(this.obj, data);
       }else{
         var t_a = this.a.bb.segmentQuery(a, b);
         var t_b = this.b.bb.segmentQuery(a, b);
         
         if( t_a < t_b ){
           if( t_a < t_exit ){
-            t_exit = Math.min( t_exit, this.a.subtreeSegmentQuery(obj, a, b, t_exit, func, data) );
+            t_exit = Math.min( t_exit, this.a.subtreeSegmentQuery(a, b, t_exit, func, data) );
           }
           if( t_b < t_exit ){
-            t_exit = Math.min( t_exit, this.b.subtreeSegmentQuery(obj, a, b, t_exit, func, data) );
+            t_exit = Math.min( t_exit, this.b.subtreeSegmentQuery(a, b, t_exit, func, data) );
           }
         }else{
           if( t_b < t_exit ){
-            t_exit = Math.min( t_exit, this.b.subtreeSegmentQuery(obj, a, b, t_exit, func, data) );
+            t_exit = Math.min( t_exit, this.b.subtreeSegmentQuery(a, b, t_exit, func, data) );
           }
           if( t_a < t_exit ){
-            t_exit = Math.min( t_exit, this.a.subtreeSegmentQuery(obj, a, b, t_exit, func, data) );
+            t_exit = Math.min( t_exit, this.a.subtreeSegmentQuery(a, b, t_exit, func, data) );
           }
         }
         return t_exit;
@@ -512,10 +512,10 @@ define(['cp/BB', 'cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Pri
       }
     },
     
-    segmentQuery: function(obj, a, b, t_exit, func, data){
+    segmentQuery: function(a, b, t_exit, func, data){
       var root = this.root;
       if( root ){
-        root.subtreeSegmentQuery(obj, a, b, func, data);
+        root.subtreeSegmentQuery(a, b, t_exit, func, data);
       }
     },
     
@@ -523,6 +523,10 @@ define(['cp/BB', 'cp/HashSet', 'cp/SpatialIndex', 'cp/constraints/util', 'cp/Pri
       if( this.root ){
         this.root.subtreeQuery(obj, bb, func, data);
       }
+    },
+    
+    indexQuery: function(){
+      this.query.apply(this, arguments);
     },
     
     count: function(){

@@ -69,7 +69,6 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
    * @namespace cp.Body.prototype
    */
   Body.prototype = {
-
     /**
      * Returns true if the body is sleeping.
      * @function isSleeping
@@ -309,7 +308,9 @@ define(['cp/Vect', 'cp/cpf', 'cp/constraints/util', 'cp/Array', 'cp/assert'], fu
       while( arb ){
         var next = arb.next(this);
         arb.swappedColl = (this === arb.body_b);
-        func.call(this, arb, data);
+        if( func.call(this, arb, data) === false ){
+          return;
+        }
         arb = next;
       }
     },

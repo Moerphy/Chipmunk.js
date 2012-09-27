@@ -31,7 +31,7 @@ define(['cp/Vect', 'cp/constraints/util', 'cp/cpf', 'cp/Array', 'cp/Prime'], fun
       }
       
       for( var i = 0; i < bin.length; ++i ){
-        if( this.eql(ptr, bin[i].elt) ){
+        if( this.eql.call(bin[i].elt, ptr ) ){
           return bin[i].elt;
         }
       }

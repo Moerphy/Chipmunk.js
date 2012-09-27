@@ -13,10 +13,12 @@ define(['cp/Vect', 'cp/constraints/Constraint', 'cp/constraints/util', 'cp/cpf']
   var GrooveJoint = function(a, b, groove_a, groove_b, anchr2){
     Constraint.call(this, a, b);
 
-    this.grv_a = groove_a;
-    this.grv_b = groove_b;
-    this.grv_n = groove_b.sub(groove_a).normalize().perp();
-    this.anchr2 = anchr2;
+    if( arguments.length ){
+      this.grv_a = groove_a;
+      this.grv_b = groove_b;
+      this.grv_n = groove_b.sub(groove_a).normalize().perp();
+      this.anchr2 = anchr2;
+    }
     
     this.jAcc = Vect.zero;
   };

@@ -356,7 +356,7 @@ int cpArbiterGetCount(const cpArbiter *arb)
     
     unthread: function(){
       unthreadHelper( this, this.body_a );
-      unthreadHelper( this, this.body_a );
+      unthreadHelper( this, this.body_b );
     }
   };
  
